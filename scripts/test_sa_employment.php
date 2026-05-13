@@ -13,7 +13,7 @@ $template = ContractTemplate::where('slug', 'sa-employment')->firstOrFail();
 
 $svc = ContractDraftingService::fromConfig();
 
-$intent = <<<AR
+$intent = <<<'AR'
 أحتاج عقد عمل سعودي لشركتنا (شركة المشاريع المتقدمة المحدودة) لتعيين السيد عبدالله بن سعود الشمري:
 - صاحب العمل: شركة المشاريع المتقدمة المحدودة
 - العامل: عبدالله بن سعود الشمري

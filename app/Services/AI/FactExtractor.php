@@ -25,7 +25,7 @@ class FactExtractor
 
     /**
      * @param  array<int, string>  $requiredKeys  field names from a template's required_fields
-     * @param  string  $intent                    user-supplied free text describing the contract
+     * @param  string  $intent  user-supplied free text describing the contract
      * @return array<string, string|int|float>
      */
     public function extract(array $requiredKeys, string $intent): array

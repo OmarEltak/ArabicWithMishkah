@@ -116,7 +116,7 @@ return [
             'key_clauses' => [
                 ['en' => 'Definition of confidential information',             'ar' => 'تعريف المعلومات السرية'],
                 ['en' => 'Permitted use and recipients',                       'ar' => 'الاستخدام المسموح والمستلمون'],
-                ['en' => 'Standard exclusions (public, prior knowledge, legal)','ar' => 'الاستثناءات المعتادة (المعلومات العامة، المعرفة السابقة، الالتزام القانوني)'],
+                ['en' => 'Standard exclusions (public, prior knowledge, legal)', 'ar' => 'الاستثناءات المعتادة (المعلومات العامة، المعرفة السابقة، الالتزام القانوني)'],
                 ['en' => 'Survival period after term end',                     'ar' => 'فترة البقاء بعد انتهاء المدة'],
                 ['en' => 'Return or destruction of materials',                 'ar' => 'إعادة المواد أو إتلافها'],
                 ['en' => 'Remedies including injunctive relief',               'ar' => 'العلاجات بما في ذلك الأمر القضائي'],

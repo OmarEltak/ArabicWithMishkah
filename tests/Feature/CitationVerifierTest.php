@@ -21,7 +21,7 @@ it('returns empty audit for a draft with no markers', function () {
 });
 
 it('extracts markers and the surrounding sentence', function () {
-    $body = "First sentence here. Second sentence cites authority [1]. Third sentence stands alone.";
+    $body = 'First sentence here. Second sentence cites authority [1]. Third sentence stands alone.';
 
     $markers = CitationVerifier::extractMarkers($body);
 
@@ -32,7 +32,7 @@ it('extracts markers and the surrounding sentence', function () {
 });
 
 it('flags every marker as unverified when no chunks were seen', function () {
-    $body = "This clause relies on [1] and also on [2].";
+    $body = 'This clause relies on [1] and also on [2].';
 
     $audit = $this->verifier->audit($body, []);
 
@@ -75,7 +75,7 @@ it('verifies a marker when its snippet matches a chunk exactly', function () {
 });
 
 it('summary tally reflects every verdict', function () {
-    $body = "Clause A [1]. Clause B [2]. Clause C [3].";
+    $body = 'Clause A [1]. Clause B [2]. Clause C [3].';
 
     $audit = $this->verifier->audit($body, []);  // no chunks → all unverified
 

@@ -21,7 +21,7 @@ $template = ContractTemplate::where('slug', 'eg-land-sale')->firstOrFail();
 
 $svc = ContractDraftingService::fromConfig();
 
-$intent = <<<AR
+$intent = <<<'AR'
 أحتاج إلى صياغة عقد بيع قطعة أرض في القاهرة، جمهورية مصر العربية:
 - البائع: السيد أحمد محمد عبد الله، رقم قومي 12345678901234، مقيم في القاهرة.
 - المشتري: السيدة فاطمة علي حسن، رقم قومي 98765432109876، مقيمة في الجيزة.

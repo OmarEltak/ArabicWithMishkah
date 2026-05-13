@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Ingestion;
 
+use Carbon\CarbonImmutable;
+
 /**
  * Tiered freshness policy for legal documents.
  *
@@ -49,7 +51,7 @@ final class RefreshPolicy
             return null;
         }
         $base = $from ?? now();
-        if ($base instanceof \DateTimeImmutable || $base instanceof \Carbon\CarbonImmutable) {
+        if ($base instanceof \DateTimeImmutable || $base instanceof CarbonImmutable) {
             return $base->modify("+{$days} days");
         }
 

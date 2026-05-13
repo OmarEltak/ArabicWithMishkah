@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Contracts;
 
+use Carbon\Carbon;
+
 /**
  * Server-side `{{placeholder}}` substitution. Pulled out of the LLM's
  * responsibility because smaller open models (Llama 3.1 8b) reliably miss
@@ -94,7 +96,7 @@ class TemplateRenderer
     private static function tryParseDate(string $value): ?\DateTimeInterface
     {
         try {
-            return \Carbon\Carbon::parse($value);
+            return Carbon::parse($value);
         } catch (\Throwable) {
             return null;
         }
@@ -102,12 +104,12 @@ class TemplateRenderer
 
     private static function today(string $locale): string
     {
-        return self::formatDate(\Carbon\Carbon::today(), $locale);
+        return self::formatDate(Carbon::today(), $locale);
     }
 
     private static function formatDate(\DateTimeInterface $date, string $locale): string
     {
-        $carbon = \Carbon\Carbon::instance($date);
+        $carbon = Carbon::instance($date);
 
         // Long, human-friendly per locale. Arabic gets "٦ مايو ٢٠٢٦" via
         // Carbon's built-in `ar` locale; English gets "6 May 2026".

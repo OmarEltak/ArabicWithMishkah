@@ -462,7 +462,7 @@ class LawSearchService
 
     /**
      * @param  array<int, string>|null  $refs  When non-null, replaces the
-     *                                          cached upstream_refs array.
+     *                                         cached upstream_refs array.
      */
     private function upsertCacheRow(
         string $normalized,

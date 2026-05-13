@@ -17,6 +17,7 @@ use Illuminate\Console\Command;
 class HealthReportCommand extends Command
 {
     protected $signature = 'health:report {--json : JSON output for piping}';
+
     protected $description = 'Print a production-health snapshot (corpus, queue, audit chain, providers)';
 
     public function handle(HealthReport $report): int
@@ -25,6 +26,7 @@ class HealthReportCommand extends Command
 
         if ($this->option('json')) {
             $this->line(json_encode($r, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
             return self::SUCCESS;
         }
 
@@ -72,11 +74,12 @@ class HealthReportCommand extends Command
         if (is_array($v)) {
             return json_encode($v, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
+
         return (string) ($v ?? '∅');
     }
 
     /**
-     * @param array<string, mixed> $r
+     * @param  array<string, mixed>  $r
      */
     private function overallStatus(array $r): string
     {
@@ -91,6 +94,7 @@ class HealthReportCommand extends Command
         if (in_array('stale', $statuses, true) || in_array('has_failures', $statuses, true)) {
             return 'degraded';
         }
+
         return 'healthy';
     }
 }

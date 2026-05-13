@@ -210,7 +210,7 @@ class FreshnessService
     }
 
     /**
-     * @return array{0: int|null, 1: int|null}  [recType, recId]
+     * @return array{0: int|null, 1: int|null} [recType, recId]
      */
     private function parseSourceRef(?string $sourceRef): array
     {

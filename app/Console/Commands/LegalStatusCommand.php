@@ -32,10 +32,12 @@ class LegalStatusCommand extends Command
 
         if ($this->option('json')) {
             $this->line(json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
             return self::SUCCESS;
         }
 
         $this->renderHuman($payload);
+
         return self::SUCCESS;
     }
 
@@ -96,8 +98,8 @@ class LegalStatusCommand extends Command
 
         $coverage = config('coverage.jurisdictions', []);
         $coverageBreakdown = [
-            'live'    => array_keys(array_filter($coverage, fn ($v) => $v === 'live')),
-            'beta'    => array_keys(array_filter($coverage, fn ($v) => $v === 'beta')),
+            'live' => array_keys(array_filter($coverage, fn ($v) => $v === 'live')),
+            'beta' => array_keys(array_filter($coverage, fn ($v) => $v === 'beta')),
             'preview' => array_keys(array_filter($coverage, fn ($v) => $v === 'preview')),
         ];
 
@@ -121,7 +123,7 @@ class LegalStatusCommand extends Command
     }
 
     /**
-     * @param array<string, mixed> $r
+     * @param  array<string, mixed>  $r
      */
     private function renderHuman(array $r): void
     {

@@ -36,11 +36,13 @@ class LegalCorpusSeedCommand extends Command
         $catalogPath = database_path('data/legal_catalog.php');
         if (! is_file($catalogPath)) {
             $this->error("Catalog file not found: {$catalogPath}");
+
             return self::FAILURE;
         }
         $catalog = require $catalogPath;
         if (! is_array($catalog)) {
             $this->error('Catalog must return an array of statute entries.');
+
             return self::FAILURE;
         }
 
@@ -103,6 +105,7 @@ class LegalCorpusSeedCommand extends Command
                     $created++;
                     $chunkCount += count($articleBlocks);
                     $bar->advance();
+
                     continue;
                 }
 
@@ -112,35 +115,36 @@ class LegalCorpusSeedCommand extends Command
                     ->first();
 
                 $payload = [
-                    'user_id'           => null,
-                    'title'             => $title,
-                    'source'            => $entry['source'],
-                    'source_ref'        => $sourceRef,
-                    'jurisdiction'      => $entry['jurisdiction'],
-                    'category'          => $entry['category'] ?? null,
-                    'tags'              => $entry['tags'] ?? null,
-                    'language'          => $entry['language'] ?? 'ar',
-                    'metadata'          => [
-                        'seeded'        => true,
-                        'title_en'      => $entry['title_en'] ?? null,
-                        'title_ar'      => $entry['title_ar'] ?? null,
-                        'citation_en'   => $entry['citation_en'] ?? null,
-                        'citation_ar'   => $entry['citation_ar'] ?? null,
+                    'user_id' => null,
+                    'title' => $title,
+                    'source' => $entry['source'],
+                    'source_ref' => $sourceRef,
+                    'jurisdiction' => $entry['jurisdiction'],
+                    'category' => $entry['category'] ?? null,
+                    'tags' => $entry['tags'] ?? null,
+                    'language' => $entry['language'] ?? 'ar',
+                    'metadata' => [
+                        'seeded' => true,
+                        'title_en' => $entry['title_en'] ?? null,
+                        'title_ar' => $entry['title_ar'] ?? null,
+                        'citation_en' => $entry['citation_en'] ?? null,
+                        'citation_ar' => $entry['citation_ar'] ?? null,
                         'article_count' => count($articleBlocks),
                     ],
-                    'content'           => $fullContent,
-                    'chunk_count'       => count($articleBlocks),
-                    'ingested_at'       => Carbon::now(),
-                    'content_hash'      => $contentHash,
-                    'snippet_hash'      => $contentHash,
-                    'last_verified_at'  => Carbon::now(),
-                    'next_check_at'     => Carbon::now()->addMonths(6),
-                    'refresh_policy'    => 'standard',
-                    'version'           => $existing?->version ?? 1,
+                    'content' => $fullContent,
+                    'chunk_count' => count($articleBlocks),
+                    'ingested_at' => Carbon::now(),
+                    'content_hash' => $contentHash,
+                    'snippet_hash' => $contentHash,
+                    'last_verified_at' => Carbon::now(),
+                    'next_check_at' => Carbon::now()->addMonths(6),
+                    'refresh_policy' => 'standard',
+                    'version' => $existing?->version ?? 1,
                 ];
 
                 if ($existing && $existing->content_hash === $contentHash) {
                     $bar->advance();
+
                     continue;
                 }
 
@@ -158,8 +162,8 @@ class LegalCorpusSeedCommand extends Command
                 foreach ($articleBlocks as $i => $a) {
                     LegalChunk::create([
                         'legal_document_id' => $doc->id,
-                        'position'          => $i,
-                        'content'           => $a['heading']."\n\n".$a['text'],
+                        'position' => $i,
+                        'content' => $a['heading']."\n\n".$a['text'],
                     ]);
                     $chunkCount++;
                 }
@@ -174,7 +178,7 @@ class LegalCorpusSeedCommand extends Command
         $this->newLine(2);
 
         $verb = $isDryRun ? 'would be' : 'were';
-        $this->info("Seed complete:");
+        $this->info('Seed complete:');
         $this->line("  • {$created} documents {$verb} created");
         $this->line("  • {$updated} documents updated");
         $this->line("  • {$chunkCount} chunks {$verb} written");
@@ -197,7 +201,7 @@ class LegalCorpusSeedCommand extends Command
         if (! $isDryRun) {
             $total = LegalDocument::count();
             $totalChunks = LegalChunk::count();
-            $this->line("Total in DB now:");
+            $this->line('Total in DB now:');
             $this->line("  • legal_documents: {$total}");
             $this->line("  • legal_chunks:    {$totalChunks}");
         }
@@ -210,11 +214,12 @@ class LegalCorpusSeedCommand extends Command
      * the citation form rather than relying on positional indexes — the
      * catalog can be reordered without breaking idempotence.
      *
-     * @param array<string,mixed> $entry
+     * @param  array<string,mixed>  $entry
      */
     private function buildSourceRef(array $entry): string
     {
         $key = strtolower(($entry['jurisdiction'] ?? '').'|'.($entry['citation_en'] ?? $entry['title_en'] ?? ''));
+
         return (string) Str::of($key)
             ->replaceMatches('/[^a-z0-9]+/', '-')
             ->trim('-')
@@ -227,7 +232,7 @@ class LegalCorpusSeedCommand extends Command
      * article. We prefer Arabic text where present (canonical wording),
      * falling back to the English structural summary.
      *
-     * @param array<string,mixed> $entry
+     * @param  array<string,mixed>  $entry
      * @return array<int, array{heading:string, text:string}>
      */
     private function articleBlocks(array $entry): array

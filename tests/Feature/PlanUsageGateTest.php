@@ -12,7 +12,7 @@ it('allows up to the plan cap and blocks the next attempt', function () {
     ]);
 
     $user = User::factory()->create(['plan' => 'free']);
-    $gate = new PlanUsageGate();
+    $gate = new PlanUsageGate;
 
     expect($gate->recordDraftAttempt($user)['used'])->toBe(1);
     expect($gate->recordDraftAttempt($user)['used'])->toBe(2);
@@ -27,7 +27,7 @@ it('treats null cap as unlimited', function () {
         'enterprise' => ['drafts_per_month' => null],
     ]);
     $user = User::factory()->create(['plan' => 'enterprise']);
-    $gate = new PlanUsageGate();
+    $gate = new PlanUsageGate;
 
     for ($i = 1; $i <= 50; $i++) {
         $gate->recordDraftAttempt($user);
@@ -44,7 +44,7 @@ it('resets the counter after 30 days', function () {
         'drafts_used_this_period' => 3,
         'usage_period_start' => now()->subDays(31)->toDateString(),
     ]);
-    $gate = new PlanUsageGate();
+    $gate = new PlanUsageGate;
 
     $result = $gate->recordDraftAttempt($user);
     expect($result['used'])->toBe(1); // reset to 0, then +1
@@ -58,7 +58,7 @@ it('exposes plan-aware snapshot for UI', function () {
         'plan' => 'solo',
         'drafts_used_this_period' => 7,
     ]);
-    $gate = new PlanUsageGate();
+    $gate = new PlanUsageGate;
 
     $snap = $gate->snapshot($user);
     expect($snap['plan'])->toBe('solo');

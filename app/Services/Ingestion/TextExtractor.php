@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Ingestion;
 
 use RuntimeException;
+use Smalot\PdfParser\Parser;
 use ZipArchive;
 
 /**
@@ -69,7 +70,7 @@ class TextExtractor
         // Primary: smalot/pdfparser. Falls back to a regex-based extractor
         // for PDFs that pdfparser can't handle (rare).
         try {
-            $parser = new \Smalot\PdfParser\Parser;
+            $parser = new Parser;
             $pdf = $parser->parseFile($path);
             $text = $pdf->getText();
             $clean = self::collapseWhitespace($text);

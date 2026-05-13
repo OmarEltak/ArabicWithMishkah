@@ -457,6 +457,7 @@ class RagService
                     $hits++;
                 }
             }
+
             // Normalise to [0,1] so it's comparable to cosine output.
             return ['chunk' => $chunk, 'score' => $hits / max(1, count($terms))];
         });

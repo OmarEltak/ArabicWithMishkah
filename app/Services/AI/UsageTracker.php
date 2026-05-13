@@ -94,7 +94,7 @@ class UsageTracker
         $globalSpend = (clone $today)->sum('cost_micros') / 1_000_000;
         if ($globalSpend >= $this->dailyBudgetUsd) {
             throw new BudgetExceededException(
-                "Daily global budget exceeded ($".number_format($globalSpend, 4)." / $".number_format($this->dailyBudgetUsd, 2).")."
+                'Daily global budget exceeded ($'.number_format($globalSpend, 4).' / $'.number_format($this->dailyBudgetUsd, 2).').'
             );
         }
 
@@ -102,7 +102,7 @@ class UsageTracker
             $userSpend = (clone $today)->where('user_id', $userId)->sum('cost_micros') / 1_000_000;
             if ($userSpend >= $this->perUserDailyBudgetUsd) {
                 throw new BudgetExceededException(
-                    "Your daily AI budget is exhausted ($".number_format($userSpend, 4)." / $".number_format($this->perUserDailyBudgetUsd, 2)."). Try again tomorrow or contact admin."
+                    'Your daily AI budget is exhausted ($'.number_format($userSpend, 4).' / $'.number_format($this->perUserDailyBudgetUsd, 2).'). Try again tomorrow or contact admin.'
                 );
             }
         }

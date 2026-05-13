@@ -17,17 +17,32 @@ namespace App\Services\Verification;
 final readonly class CorpusGateReport
 {
     /**
-     * @param array<int, array{raw:string, article:?string, law:?string, jurisdiction:?string, score:int, status:string}> $results
+     * @param  array<int, array{raw:string, article:?string, law:?string, jurisdiction:?string, score:int, status:string}>  $results
      */
     public function __construct(
         public array $results,
         public ?string $jurisdiction = null,
     ) {}
 
-    public function totalCitations(): int { return count($this->results); }
-    public function verifiedCount(): int { return $this->countByStatus('verified'); }
-    public function uncertainCount(): int { return $this->countByStatus('uncertain'); }
-    public function unverifiedCount(): int { return $this->countByStatus('unverified'); }
+    public function totalCitations(): int
+    {
+        return count($this->results);
+    }
+
+    public function verifiedCount(): int
+    {
+        return $this->countByStatus('verified');
+    }
+
+    public function uncertainCount(): int
+    {
+        return $this->countByStatus('uncertain');
+    }
+
+    public function unverifiedCount(): int
+    {
+        return $this->countByStatus('unverified');
+    }
 
     /**
      * Pass = no unverified citations. Uncertain ones still pass but are
@@ -48,6 +63,7 @@ final readonly class CorpusGateReport
             return 100;
         }
         $passing = $this->verifiedCount() + $this->uncertainCount();
+
         return (int) round($passing / $total * 100);
     }
 

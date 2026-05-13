@@ -42,7 +42,7 @@ it('returns next-check intervals matching the policy tier', function () {
 
 it('hashes content stably across cosmetic whitespace differences', function () {
     $a = "Article 1.\n\nThis is the law.";
-    $b = "Article 1.   This is the law.   ";
+    $b = 'Article 1.   This is the law.   ';
 
     expect(FreshnessService::hashContent($a))->toBe(FreshnessService::hashContent($b));
 });

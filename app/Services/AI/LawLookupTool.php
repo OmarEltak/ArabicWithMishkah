@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\AI;
 
+use App\Models\LegalChunk;
 use App\Models\LegalDocument;
 use App\Services\Ingestion\EastlawsIngestService;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -107,7 +109,7 @@ class LawLookupTool
         // is passed through. Both are optional; if neither set, search the
         // full corpus.
         $filters = [];
-        $isoFromCountry = \App\Services\Ingestion\EastlawsIngestService::isoForCountryId($countryId);
+        $isoFromCountry = EastlawsIngestService::isoForCountryId($countryId);
         if ($isoFromCountry !== '') {
             $filters['jurisdiction'] = $isoFromCountry;
         }
@@ -182,7 +184,7 @@ class LawLookupTool
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, array{chunk: \App\Models\LegalChunk, score: float}>  $local
+     * @param  Collection<int, array{chunk: LegalChunk, score: float}>  $local
      */
     private function recordSeen($local): void
     {
@@ -195,7 +197,7 @@ class LawLookupTool
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, array{chunk: \App\Models\LegalChunk, score: float}>  $local
+     * @param  Collection<int, array{chunk: LegalChunk, score: float}>  $local
      */
     private function formatResults($local, string $source): string
     {

@@ -35,6 +35,7 @@ class FakeLlm implements LlmInterface
 {
     /** @var array<int, array{role:string,content:string}> */
     public array $lastMessages = [];
+
     /** @var array<string,mixed> */
     public array $lastOptions = [];
 
@@ -63,6 +64,7 @@ class FakeLlm implements LlmInterface
         if (str_contains($systemText, 'ASK FOCUSED CLARIFYING') || str_contains($systemText, 'gather just enough')) {
             return ['content' => $this->scripted['clarifying'] ?? '{"questions":["Who are the parties?","What is the governing law?"],"ready_to_draft":false,"collected_facts":{}}'];
         }
+
         // Draft path
         return ['content' => $this->scripted['draft'] ?? 'DRAFTED-CONTRACT-BODY'];
     }
@@ -71,6 +73,7 @@ class FakeLlm implements LlmInterface
     {
         $response = $this->chat($messages, $options);
         $onDelta($response['content']);
+
         return $response;
     }
 
@@ -90,7 +93,7 @@ function makeServiceWithFakeLlm(FakeLlm $llm): ContractDraftingService
     $rag = RagService::fromConfig();
     $lookup = new LawLookupTool($rag, EastlawsIngestService::fromConfig());
     $verifier = new CitationVerifier(EmbeddingService::fromConfig());
-    $gate = new CorpusCitationGate();
+    $gate = new CorpusCitationGate;
 
     return new ContractDraftingService(
         llm: $llm,

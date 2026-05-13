@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\AI;
 
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -78,7 +79,7 @@ class GroqService implements LlmInterface
         if (count($this->apiKeys) <= 1) {
             return 0;
         }
-        $stored = \Illuminate\Support\Facades\Cache::driver('array')->get(self::ACTIVE_KEY_CACHE, 0);
+        $stored = Cache::driver('array')->get(self::ACTIVE_KEY_CACHE, 0);
 
         return is_int($stored) ? max(0, min(count($this->apiKeys) - 1, $stored)) : 0;
     }
@@ -88,7 +89,7 @@ class GroqService implements LlmInterface
         if (count($this->apiKeys) <= 1) {
             return;
         }
-        \Illuminate\Support\Facades\Cache::driver('array')->put(
+        Cache::driver('array')->put(
             self::ACTIVE_KEY_CACHE,
             $index % count($this->apiKeys),
             300

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Contracts;
 
 use App\Models\Contract;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use PhpOffice\PhpWord\Element\Section;
+use PhpOffice\PhpWord\IOFactory;
 use PhpOffice\PhpWord\PhpWord;
-use PhpOffice\PhpWord\Shared\Html;
 use PhpOffice\PhpWord\SimpleType\Jc;
 
 /**
@@ -58,7 +60,7 @@ class ContractExporter
             $this->writeSingleBody($section, $contract);
         }
 
-        $writer = \PhpOffice\PhpWord\IOFactory::createWriter($word, 'Word2007');
+        $writer = IOFactory::createWriter($word, 'Word2007');
         $tmp = tempnam(sys_get_temp_dir(), 'docx_');
         $writer->save($tmp);
 
@@ -76,7 +78,7 @@ class ContractExporter
     /**
      * Single-column Arabic body (legacy path). Extracted from toDocx for clarity.
      *
-     * @param  \PhpOffice\PhpWord\Element\Section  $section
+     * @param  Section  $section
      */
     private function writeSingleBody($section, Contract $contract): void
     {
@@ -125,7 +127,7 @@ class ContractExporter
      * Paragraphs are zipped pairwise; if one side is shorter, blank cells
      * pad the layout.
      *
-     * @param  \PhpOffice\PhpWord\Element\Section  $section
+     * @param  Section  $section
      * @param  array<string, mixed>  $translation  meta from Contract->translations[$lang]
      */
     private function writeBilingualBody($section, Contract $contract, string $lang, array $translation): void
@@ -199,7 +201,7 @@ class ContractExporter
         $generatedAt = $translation['generated_at'] ?? '';
         $section->addTextBreak(1);
         $section->addText(
-            'Translation prepared by My-lawyer AI on '.\Illuminate\Support\Carbon::parse($generatedAt ?: now())->toFormattedDateString().'.',
+            'Translation prepared by My-lawyer AI on '.Carbon::parse($generatedAt ?: now())->toFormattedDateString().'.',
             ['italic' => true, 'size' => 8, 'color' => '999999'],
         );
     }

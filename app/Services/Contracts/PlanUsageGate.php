@@ -89,6 +89,7 @@ final class PlanUsageGate
         $start = $u->usage_period_start ? Carbon::parse($u->usage_period_start) : null;
         if ($start === null) {
             $u->usage_period_start = now()->toDateString();
+
             return;
         }
         if ($start->diffInDays(now()) >= 30) {

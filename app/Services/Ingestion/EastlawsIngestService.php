@@ -6,6 +6,7 @@ namespace App\Services\Ingestion;
 
 use App\Models\LegalDocument;
 use App\Models\User;
+use App\Services\AI\RagService;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -173,7 +174,7 @@ class EastlawsIngestService
             ])->save();
 
             // Re-index chunks. indexDocument supersedes any prior chunks first.
-            app(\App\Services\AI\RagService::class)->indexDocument($existing->fresh());
+            app(RagService::class)->indexDocument($existing->fresh());
 
             return $existing->fresh();
         }

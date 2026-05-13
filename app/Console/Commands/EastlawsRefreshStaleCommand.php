@@ -64,7 +64,7 @@ class EastlawsRefreshStaleCommand extends Command
                 continue;
             }
 
-            $this->line("  ".$doc->id.': '.mb_substr((string) $doc->title, 0, 80));
+            $this->line('  '.$doc->id.': '.mb_substr((string) $doc->title, 0, 80));
             $outcome = $freshness->verify($doc);
             $tally[$outcome] = ($tally[$outcome] ?? 0) + 1;
             $this->line('    → '.$outcome);

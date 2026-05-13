@@ -33,7 +33,7 @@ return new class extends Migration
         // on first run; harmless thereafter.
         try {
             DB::statement('CREATE EXTENSION IF NOT EXISTS vector');
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Extension not available on this Postgres install. The pgvector
             // path will simply stay disabled; in-PHP cosine continues to work.
             return;
@@ -56,14 +56,14 @@ return new class extends Migration
                 'CREATE INDEX IF NOT EXISTS legal_chunks_embedding_pgv_hnsw
                  ON legal_chunks USING hnsw (embedding_pgv vector_cosine_ops)'
             );
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // older pgvector — try ivfflat, then give up silently.
             try {
                 DB::statement(
                     'CREATE INDEX IF NOT EXISTS legal_chunks_embedding_pgv_ivf
                      ON legal_chunks USING ivfflat (embedding_pgv vector_cosine_ops) WITH (lists = 100)'
                 );
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // No vector index. Sequential scan is fine up to ~50k rows.
             }
         }
@@ -78,7 +78,7 @@ return new class extends Migration
             DB::statement('DROP INDEX IF EXISTS legal_chunks_embedding_pgv_hnsw');
             DB::statement('DROP INDEX IF EXISTS legal_chunks_embedding_pgv_ivf');
             DB::statement('ALTER TABLE legal_chunks DROP COLUMN IF EXISTS embedding_pgv');
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // safe rollback
         }
     }

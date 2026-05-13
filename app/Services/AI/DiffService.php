@@ -6,6 +6,7 @@ namespace App\Services\AI;
 
 use App\Models\LegalChunk;
 use App\Models\LegalDocument;
+use Illuminate\Support\Collection;
 
 /**
  * Compares two snapshots of a legal document and produces a per-chunk diff
@@ -91,9 +92,9 @@ class DiffService
     }
 
     /**
-     * @return \Illuminate\Support\Collection<int, LegalChunk>  keyed by position
+     * @return Collection<int, LegalChunk> keyed by position
      */
-    private function chunksForVersion(LegalDocument $doc, int $version): \Illuminate\Support\Collection
+    private function chunksForVersion(LegalDocument $doc, int $version): Collection
     {
         return LegalChunk::query()
             ->where('legal_document_id', $doc->id)

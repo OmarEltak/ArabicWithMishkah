@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Verification;
 
 use App\Models\LegalDocument;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Scans a generated contract draft for citation patterns and verifies each
@@ -32,11 +30,14 @@ final class CorpusCitationGate
 {
     /** @var int Minimum confidence (0–100) below which we mark unverified. */
     private const VERIFIED_THRESHOLD = 70;
+
     private const UNCERTAIN_THRESHOLD = 40;
 
     /** Strong-signal weights. */
     private const ARTICLE_MATCH_SCORE = 75;
+
     private const LAW_MATCH_SCORE = 40;
+
     private const JURISDICTION_BONUS = 10;
 
     /**
@@ -53,12 +54,12 @@ final class CorpusCitationGate
             $score = $this->scoreCitation($cite, $jurisdiction);
             $status = $this->classifyScore($score);
             $results[] = [
-                'raw'         => $cite['raw'],
-                'article'     => $cite['article'] ?? null,
-                'law'         => $cite['law'] ?? null,
-                'jurisdiction'=> $cite['jurisdiction'] ?? $jurisdiction,
-                'score'       => $score,
-                'status'      => $status,
+                'raw' => $cite['raw'],
+                'article' => $cite['article'] ?? null,
+                'law' => $cite['law'] ?? null,
+                'jurisdiction' => $cite['jurisdiction'] ?? $jurisdiction,
+                'score' => $score,
+                'status' => $status,
             ];
         }
 
@@ -86,9 +87,9 @@ final class CorpusCitationGate
         );
         foreach ($m as $hit) {
             $hits[] = [
-                'raw'     => trim($hit[0]),
+                'raw' => trim($hit[0]),
                 'article' => trim($hit['num']),
-                'law'     => isset($hit['law']) ? trim($hit['law']) : null,
+                'law' => isset($hit['law']) ? trim($hit['law']) : null,
             ];
         }
 
@@ -142,14 +143,14 @@ final class CorpusCitationGate
             // clause heading we couldn't detect by punctuation alone.
             $hasExternalAnchor = preg_match('/\bمن\s+/u', $context);
             // Or starts with one of the linking prefixes (للمادة, بالمادة, etc.)
-            $hasLinkingPrefix = in_array(trim($hit[1]), ['للمادة','للمادتين','للمواد','بالمادة','بالمادتين','بالمواد'], true);
+            $hasLinkingPrefix = in_array(trim($hit[1]), ['للمادة', 'للمادتين', 'للمواد', 'بالمادة', 'بالمادتين', 'بالمواد'], true);
 
             if (! $hasExternalAnchor && ! $hasLinkingPrefix) {
                 continue;
             }
 
             $hits[] = [
-                'raw'     => trim($hit[1].' '.$hit[2]),
+                'raw' => trim($hit[1].' '.$hit[2]),
                 'article' => $this->arabicNumeralsToWestern(trim($hit[2])),
             ];
         }
@@ -192,8 +193,8 @@ final class CorpusCitationGate
                     ->join('legal_chunks', 'legal_chunks.legal_document_id', '=', 'legal_documents.id')
                     ->where(function ($q) use ($num) {
                         $q->where('legal_chunks.content', 'like', 'Article '.$num.' %')
-                          ->orWhere('legal_chunks.content', 'like', 'Article '.$num.'—%')
-                          ->orWhere('legal_chunks.content', 'like', '%— Article '.$num.'%');
+                            ->orWhere('legal_chunks.content', 'like', 'Article '.$num.'—%')
+                            ->orWhere('legal_chunks.content', 'like', '%— Article '.$num.'%');
                     });
                 if ($jurisdiction) {
                     $jurMatch = (clone $articleQuery)->where('legal_documents.jurisdiction', $jurisdiction)->count();
@@ -217,8 +218,8 @@ final class CorpusCitationGate
             $lawQuery = LegalDocument::query()
                 ->where(function ($q) use ($lawHint) {
                     $q->where('title', 'like', '%'.$lawHint.'%')
-                      ->orWhere('metadata->citation_en', 'like', '%'.$lawHint.'%')
-                      ->orWhere('metadata->citation_ar', 'like', '%'.$lawHint.'%');
+                        ->orWhere('metadata->citation_en', 'like', '%'.$lawHint.'%')
+                        ->orWhere('metadata->citation_ar', 'like', '%'.$lawHint.'%');
                 });
             if ($jurisdiction) {
                 $lawQuery->where('jurisdiction', $jurisdiction);
@@ -244,6 +245,7 @@ final class CorpusCitationGate
         if ($score >= self::UNCERTAIN_THRESHOLD) {
             return 'uncertain';
         }
+
         return 'unverified';
     }
 
@@ -256,7 +258,7 @@ final class CorpusCitationGate
     }
 
     /**
-     * @param array<int, array<string, mixed>> $hits
+     * @param  array<int, array<string, mixed>>  $hits
      * @return array<int, array<string, mixed>>
      */
     private function dedupeCitations(array $hits): array
@@ -271,6 +273,7 @@ final class CorpusCitationGate
             $seen[$key] = true;
             $out[] = $h;
         }
+
         return $out;
     }
 }

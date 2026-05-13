@@ -18,7 +18,7 @@ echo "Template: {$template->name} [{$template->jurisdiction}/{$template->categor
 
 $svc = ContractDraftingService::fromConfig();
 
-$intent = <<<AR
+$intent = <<<'AR'
 أحتاج عقد شركاء بين السيد محمد سيف الدين والسيد طارق فهمي لتأسيس شركة "تك جلوبال للحلول الرقمية" — شركة ذات مسؤولية محدودة برأس مال قدره 1,000,000 جنيه مصري.
 - محمد سيف الدين: حصة 60%
 - طارق فهمي: حصة 40%

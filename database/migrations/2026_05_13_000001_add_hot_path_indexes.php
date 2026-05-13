@@ -39,7 +39,7 @@ return new class extends Migration
     }
 
     /**
-     * @param array<int, string> $columns
+     * @param  array<int, string>  $columns
      */
     private function addIndexIfMissing(string $table, array $columns, string $name): void
     {
@@ -47,7 +47,7 @@ return new class extends Migration
             Schema::table($table, function (Blueprint $blueprint) use ($columns, $name): void {
                 $blueprint->index($columns, $name);
             });
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Already exists, table missing, or driver doesn't support — skip.
         }
     }
@@ -58,7 +58,7 @@ return new class extends Migration
             Schema::table($table, function (Blueprint $blueprint) use ($name): void {
                 $blueprint->dropIndex($name);
             });
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Index didn't exist — skip.
         }
     }

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\LegalDocument;
 use App\Services\Ingestion\EastlawsClient;
 use App\Services\Ingestion\EastlawsIngestService;
 use App\Services\Ingestion\FreshnessService;
@@ -45,7 +46,7 @@ it('runs a full search → ingest → verify cycle for one document', function (
 
     if (count($stats['documents']) > 0) {
         $docId = $stats['documents'][0]['id'];
-        $doc = \App\Models\LegalDocument::find($docId);
+        $doc = LegalDocument::find($docId);
         expect($doc)->not->toBeNull();
 
         // Round-trip via FreshnessService — should be 'unchanged' since we

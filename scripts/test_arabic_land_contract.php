@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\Contract;
 use App\Models\User;
 use App\Services\Contracts\ContractDraftingService;
 
@@ -12,7 +11,7 @@ echo "Using user: {$user->email} (#{$user->id})\n";
 /** @var ContractDraftingService $svc */
 $svc = app(ContractDraftingService::class);
 
-$intent = <<<AR
+$intent = <<<'AR'
 أحتاج إلى صياغة عقد بيع قطعة أرض في القاهرة، جمهورية مصر العربية، مع توضيح:
 - البائع: السيد أحمد محمد عبد الله، رقم قومي 12345678901234، مقيم في القاهرة.
 - المشتري: السيدة فاطمة علي حسن، رقم قومي 98765432109876، مقيمة في الجيزة.

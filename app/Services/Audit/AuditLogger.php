@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Request;
 
 /**
@@ -83,7 +84,7 @@ class AuditLogger
             });
         } catch (\Throwable $e) {
             // Audit failures must never break the user-facing flow. Log it.
-            \Illuminate\Support\Facades\Log::error('AuditLogger write failed', [
+            Log::error('AuditLogger write failed', [
                 'action' => $action,
                 'error' => $e->getMessage(),
             ]);

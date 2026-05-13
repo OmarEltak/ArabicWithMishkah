@@ -69,6 +69,7 @@ class LegalEmbedBackfillCommand extends Command
 
         if ($total === 0) {
             $this->info('Nothing to embed. (Use --force to re-embed existing rows.)');
+
             return self::SUCCESS;
         }
 
@@ -76,6 +77,7 @@ class LegalEmbedBackfillCommand extends Command
 
         if ($dryRun) {
             $this->line('Dry run: no writes performed.');
+
             return self::SUCCESS;
         }
 
@@ -85,7 +87,7 @@ class LegalEmbedBackfillCommand extends Command
         $processed = 0;
         $errors = 0;
 
-        $query->select(['id', 'content'])->orderBy('id')->chunkById($batch, function ($chunks) use ($embed, $bar, &$processed, &$errors, $modelName, $batch) {
+        $query->select(['id', 'content'])->orderBy('id')->chunkById($batch, function ($chunks) use ($embed, $bar, &$processed, &$errors, $modelName) {
             $inputs = $chunks->pluck('content')->map(fn ($c) => (string) $c)->all();
 
             try {
@@ -97,6 +99,7 @@ class LegalEmbedBackfillCommand extends Command
                     'chunk_ids' => $chunks->pluck('id')->all(),
                 ]);
                 $bar->advance($chunks->count());
+
                 return;
             }
 
@@ -104,6 +107,7 @@ class LegalEmbedBackfillCommand extends Command
                 $vec = $vectors[$i] ?? null;
                 if (! is_array($vec) || $vec === []) {
                     $errors++;
+
                     continue;
                 }
                 $chunk->update([
