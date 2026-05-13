@@ -1,0 +1,61 @@
+# My-lawyer
+
+> AI-powered contract drafting platform built for corporate counsel across MENA jurisdictions. Drafts contracts in Arabic, grounds every clause in the controlling civil code or labour law, and exports a bilingual Arabic / English document with the language-prevailing clause auto-appended.
+
+My-lawyer covers eleven Arabic-language jurisdictions: Egypt, Saudi Arabia, the United Arab Emirates, Kuwait, Qatar, Bahrain, Oman, Jordan, Lebanon, Tunisia, and Libya. Each jurisdiction has its own indexed legal corpus and a curated bilingual translation glossary. Civil-law terminology is locked across the document — `حسن النية` always renders as "good faith" (in the civil-law sense), `الحصص` as "quotas (LLC)" not "shares", `الفسخ` as "judicial rescission" not "termination".
+
+Every clause cites its controlling article. Citations are verified against a live snapshot of the source statutes. Unverifiable citations are flagged, never silently shipped.
+
+## Product
+
+- [Homepage](https://my-lawyer.test/) — overview, sample output, capabilities
+- [Sample output preview](https://my-lawyer.test/#preview) — bilingual contract preview with citation verification + glossary lock indicator
+- [FAQ](https://my-lawyer.test/faq) — common questions about drafting, translation, jurisdictions, version history, provider failover
+
+## Jurisdictions
+
+- [Egypt (EG)](https://my-lawyer.test/jurisdictions/EG) — Egyptian Civil Code (Law 131/1948), Companies Law 159/1981, Labour Law 12/2003
+- [Saudi Arabia (SA)](https://my-lawyer.test/jurisdictions/SA) — Civil Transactions Law (Royal Decree M/191 of 1444H), Companies Law 1437H
+- [UAE (AE)](https://my-lawyer.test/jurisdictions/AE) — Civil Transactions Law (Federal Law 5/1985), Companies Law (Federal Decree-Law 32/2021)
+- [Kuwait (KW)](https://my-lawyer.test/jurisdictions/KW) — Civil Code (Decree-Law 67/1980), Companies Law 1/2016
+- [Qatar (QA)](https://my-lawyer.test/jurisdictions/QA) — Civil Code (Law 22/2004), Companies Law 11/2015
+- [Bahrain (BH)](https://my-lawyer.test/jurisdictions/BH) — Civil Code (Decree-Law 19/2001), Companies Law 21/2001
+- [Oman (OM)](https://my-lawyer.test/jurisdictions/OM) — Civil Transactions Law (Royal Decree 29/2013)
+- [Jordan (JO)](https://my-lawyer.test/jurisdictions/JO) — Civil Code (Law 43/1976)
+- [Lebanon (LB)](https://my-lawyer.test/jurisdictions/LB) — Code of Obligations and Contracts (1932)
+- [Tunisia (TN)](https://my-lawyer.test/jurisdictions/TN) — Code of Obligations and Contracts
+- [Libya (LY)](https://my-lawyer.test/jurisdictions/LY) — Civil Code (1953)
+
+## Glossaries
+
+- [Glossary index](https://my-lawyer.test/glossary) — directory of nine bilingual civil-law glossaries
+- [Egyptian glossary](https://my-lawyer.test/glossary/eg) — 180+ civil-law terms
+- [Saudi glossary](https://my-lawyer.test/glossary/sa)
+- [UAE glossary](https://my-lawyer.test/glossary/ae)
+- [Kuwaiti glossary](https://my-lawyer.test/glossary/kw)
+- [Qatari glossary](https://my-lawyer.test/glossary/qa)
+- [Bahraini glossary](https://my-lawyer.test/glossary/bh)
+- [Omani glossary](https://my-lawyer.test/glossary/om)
+- [Jordanian glossary](https://my-lawyer.test/glossary/jo)
+- [Lebanese glossary](https://my-lawyer.test/glossary/lb)
+
+## Pricing
+
+- See [/pricing.md](https://my-lawyer.test/pricing.md) for machine-readable pricing tiers.
+
+## Resources
+
+- [Sitemap](https://my-lawyer.test/sitemap.xml)
+- [Robots](https://my-lawyer.test/robots.txt)
+
+## What makes it different
+
+- **Citation-grounded, not hallucinated**: Every clause cites the controlling article. Citations are verified against the source statute.
+- **Arabic-first**: The Arabic version is the legally binding text. English is the working translation, prepared for non-Arabic-reading parties.
+- **Civil-law aware**: Civil-law concepts (good faith, judicial rescission, force majeure, quotas) are translated by their civil-law meaning, not their common-law cognate.
+- **Region-specific**: Eleven jurisdictions, each with its own civil code, companies law, labour law, and citation form. The drafter picks the right one based on governing-law clause.
+- **Versioned and auditable**: Every revision is captured. Compare drafts clause by clause. Roll back when senior counsel disagrees.
+
+## Audience
+
+Corporate counsel, in-house legal teams, M&A lawyers, transactional attorneys, and law firms operating across MENA jurisdictions where the contract is filed, registered, notarized, and litigated in Arabic.

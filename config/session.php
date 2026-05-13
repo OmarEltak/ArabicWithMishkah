@@ -169,7 +169,11 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    // Default to secure cookies in production. Override with
+    // SESSION_SECURE_COOKIE=false only for local HTTP development.
+    // Note: avoid using app() here — config is loaded before the container
+    // is fully booted, and any binding error becomes "facade root not set".
+    'secure' => env('SESSION_SECURE_COOKIE', env('APP_ENV', 'production') !== 'local'),
 
     /*
     |--------------------------------------------------------------------------

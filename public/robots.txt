@@ -1,2 +1,112 @@
+# My-lawyer · robots.txt
+# AI search bots and traditional crawlers are explicitly allowed
+# on public marketing content. Authenticated areas are blocked.
+
+# ────────────────────────────────────────
+# Default rule for all crawlers
+# ────────────────────────────────────────
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+Disallow: /settings/
+Disallow: /__dev/
+Disallow: /login
+Disallow: /register
+Disallow: /password/
+Disallow: /verify-email
+Disallow: /confirm-password
+Disallow: /two-factor
+
+# ────────────────────────────────────────
+# AI search bots — explicitly allowed for citation
+# Blocking these prevents AI platforms from citing us
+# ────────────────────────────────────────
+
+# OpenAI — ChatGPT search
+User-agent: GPTBot
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+Disallow: /settings/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+
+# Anthropic — Claude
+User-agent: ClaudeBot
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+
+User-agent: anthropic-ai
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+
+User-agent: Claude-Web
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+
+# Perplexity
+User-agent: PerplexityBot
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+
+# Google AI Overviews + Gemini
+User-agent: Google-Extended
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+
+# Apple Intelligence
+User-agent: Applebot
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+
+# Meta AI
+User-agent: FacebookBot
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+
+User-agent: Meta-ExternalAgent
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+
+# DuckDuckGo AI
+User-agent: DuckAssistBot
+Allow: /
+Disallow: /lawyer/
+Disallow: /dashboard
+
+# ────────────────────────────────────────
+# Training-only crawlers — disallowed
+# (no citation value, just bulk training)
+# ────────────────────────────────────────
+User-agent: CCBot
+Disallow: /
+
+User-agent: omgili
+Disallow: /
+
+# ────────────────────────────────────────
+# Sitemap
+# ────────────────────────────────────────
+Sitemap: /sitemap.xml

@@ -107,6 +107,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Audit Trail Signing Key
+    |--------------------------------------------------------------------------
+    |
+    | Dedicated HMAC key used by App\Services\Audit\HashChain to sign every
+    | audit_logs row. MUST be a high-entropy random value, kept distinct
+    | from APP_KEY so a compromise of one does not invalidate the other.
+    | If not set, HashChain falls back to APP_KEY in development; production
+    | deployments must set APP_AUDIT_KEY explicitly.
+    |
+    | Generate with: php -r "echo base64_encode(random_bytes(48));"
+    |
+    */
+
+    'audit_key' => env('APP_AUDIT_KEY'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Internal Health Endpoint Key
+    |--------------------------------------------------------------------------
+    |
+    | Shared secret for the /__internal/health endpoint. Monitoring services
+    | include `X-Internal-Health-Key: <value>` on each probe. Generate with:
+    |   php -r "echo bin2hex(random_bytes(32));"
+    |
+    */
+
+    'internal_health_key' => env('APP_INTERNAL_HEALTH_KEY'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Maintenance Mode Driver
     |--------------------------------------------------------------------------
     |

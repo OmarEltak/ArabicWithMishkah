@@ -8,9 +8,25 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+/*
+ * My-lawyer design system
+ *
+ *  Aesthetic: editorial restraint. Documents are the product, the chrome
+ *  recedes. Serif for personality (Frank Ruhl Libre — first-class Arabic),
+ *  sans for readability (Inter), accent reserved for primary CTAs only.
+ *
+ *  Color tokens are SEMANTIC. Never write raw hex in components — use the
+ *  --color-ink / --color-paper / --color-accent / --color-success / etc.
+ *  variables so light + dark swap consistently and so a future rebrand is
+ *  one file change.
+ */
 
+@theme {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-serif: 'Frank Ruhl Libre', ui-serif, Georgia, 'Times New Roman', serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+    /* Neutrals — desaturated cool slate, leans into legal-document gravitas. */
     --color-zinc-50: #fafafa;
     --color-zinc-100: #f5f5f5;
     --color-zinc-200: #e5e5e5;
@@ -23,27 +39,258 @@
     --color-zinc-900: #171717;
     --color-zinc-950: #0a0a0a;
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
-    --color-accent-foreground: var(--color-white);
+    /* Brand: deep ink primary, parchment-warm accent for highlights.
+     * IMPORTANT: tokens that flip with dark mode are TEXT-tier; tokens
+     * that always stay dark (e.g. user-bubble background) are SURFACE-tier
+     * and live below. Don't reuse a text token as a surface. */
+    --color-ink: #1a2332;            /* dark mode: cream — used for foreground text and brand title */
+    --color-paper: #fcfaf6;          /* warm off-white body bg in light, near-black in dark */
+    --color-paper-edge: #f3eee2;     /* paper bg with hairline contrast */
+    --color-parchment: #fbf3d8;      /* warm accent for highlights / selected rows */
+    --color-parchment-edge: #e9dca6;
+    --color-accent: #a8763a;         /* warm gold — single primary CTA color */
+    --color-accent-hover: #8c6230;
+    --color-accent-content: #1a2332;
+    --color-accent-foreground: #ffffff;
+
+    /* Surface-tier tokens — these DO NOT flip in dark mode. Use these for
+     * always-dark bubbles, brand chips, and badges that need consistent
+     * contrast against any background. */
+    --surface-deep: #1a2332;          /* always-dark navy surface */
+    --surface-deep-hover: #2a3a52;
+    --surface-deep-fg: #f5f0e0;       /* foreground for surface-deep */
+
+    /* Semantic status (verified / uncertain / unverified / refused). */
+    --color-success: #047857;
+    --color-success-soft: #d1fae5;
+    --color-warning: #b45309;
+    --color-warning-soft: #fef3c7;
+    --color-danger: #b91c1c;
+    --color-danger-soft: #fee2e2;
+    --color-info: #1e40af;
+    --color-info-soft: #dbeafe;
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        --color-ink: #f5f0e0;            /* text-tier flips for legibility */
+        --color-paper: #0e1218;
+        --color-paper-edge: #161b24;
+        --color-parchment: #2a2114;
+        --color-parchment-edge: #4a3820;
+        --color-accent: #d3a05f;
+        --color-accent-hover: #e8b878;
+        --color-accent-content: #f5f0e0;
+        --color-accent-foreground: #0e1218;
+        --color-success: #6ee7b7;
+        --color-success-soft: #064e3b;
+        --color-warning: #fcd34d;
+        --color-warning-soft: #78350f;
+        --color-danger: #fca5a5;
+        --color-danger-soft: #7f1d1d;
+        --color-info: #93c5fd;
+        --color-info-soft: #1e3a8a;
+        /* surface-deep stays the same in both modes — that's the point. */
     }
 }
 
 @layer base {
-
     *,
     ::after,
     ::before,
     ::backdrop,
     ::file-selector-button {
-        border-color: var(--color-gray-200, currentColor);
+        border-color: var(--color-zinc-200, currentColor);
+    }
+    .dark *,
+    .dark ::after,
+    .dark ::before {
+        border-color: var(--color-zinc-800);
+    }
+
+    /* Body text: 16px minimum, 1.6 line-height — UX rule §6. */
+    html {
+        font-feature-settings: 'cv11', 'ss01', 'ss03';
+    }
+    body {
+        font-size: 15px;
+        line-height: 1.6;
+        font-feature-settings: 'cv11';
+    }
+
+    /* Tabular figures for prices, IDs, costs, timestamps — UX rule number-tabular. */
+    .tabular-nums,
+    table tbody td:not(:first-child),
+    .font-mono {
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* RTL adjustments: serif headings need slight letter-spacing relief in Arabic. */
+    [dir="rtl"] .font-serif,
+    [dir="rtl"] h1,
+    [dir="rtl"] h2,
+    [dir="rtl"] h3 {
+        letter-spacing: 0;
+    }
+}
+
+/* Status pill — single primitive used everywhere for verdicts/statuses.
+ * UX rule §6 (semantic tokens) + §10 (color-not-only — pair with text + icon).
+ */
+@layer components {
+    .pill {
+        @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium uppercase tracking-wide;
+    }
+    .pill-success {
+        background: var(--color-success-soft);
+        color: var(--color-success);
+    }
+    .pill-warning {
+        background: var(--color-warning-soft);
+        color: var(--color-warning);
+    }
+    .pill-danger {
+        background: var(--color-danger-soft);
+        color: var(--color-danger);
+    }
+    .pill-info {
+        background: var(--color-info-soft);
+        color: var(--color-info);
+    }
+    .pill-neutral {
+        @apply bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300;
+    }
+
+    /* Hairline — softer than border-zinc-200 default, used between rows + cards. */
+    .hairline {
+        border-color: color-mix(in oklab, var(--color-zinc-300) 70%, transparent);
+    }
+    .dark .hairline {
+        border-color: color-mix(in oklab, var(--color-zinc-700) 80%, transparent);
+    }
+
+    /* Card — used everywhere a panel sits on the paper background. */
+    .card {
+        @apply rounded-lg border bg-white shadow-[0_1px_0_rgba(15,23,42,0.04)] dark:bg-zinc-900 dark:shadow-none;
+        border-color: color-mix(in oklab, var(--color-zinc-300) 70%, transparent);
+    }
+    .dark .card {
+        border-color: color-mix(in oklab, var(--color-zinc-700) 80%, transparent);
+    }
+
+    /* Section header — small uppercase label that opens a content block. */
+    .eyebrow {
+        @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400;
+    }
+
+    /* Display heading — serif, used on page top + dashboard hero. */
+    .display {
+        font-family: var(--font-serif);
+        font-weight: 500;
+        letter-spacing: -0.015em;
+    }
+
+    /* Subtle, paper-tone background on the body so cards visibly sit on top. */
+    .surface-paper {
+        background: var(--color-paper);
+    }
+    .dark .surface-paper {
+        background: var(--color-paper);
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+     * Premium-tier additions (high-end visual-design skill, Section 4A):
+     * Double-Bezel architecture — containers sit inside a hairline outer
+     * shell with concentric radii, simulating machined hardware. Used
+     * for the bilingual document panes and toolbar islands.
+     * ─────────────────────────────────────────────────────────────────
+     */
+
+    /* Outer shell — wraps a content card inside a subtle tray. */
+    .bezel {
+        @apply rounded-[1.25rem] p-1 ring-1 ring-zinc-200/70 dark:ring-zinc-800/70;
+        background: color-mix(in oklab, var(--color-zinc-50) 60%, transparent);
+    }
+    .dark .bezel {
+        background: color-mix(in oklab, var(--color-zinc-950) 40%, transparent);
+    }
+
+    /* Inner core — sits inside .bezel with concentric (smaller) radius
+     * and its own surface. Outer 1.25rem − 0.25rem padding = 1rem inner. */
+    .bezel-inner {
+        @apply rounded-[1rem] bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] dark:bg-zinc-900 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)];
+    }
+
+    /* Segmented action group ("island"). Cluster related toolbar actions
+     * inside one chrome shell with hairline separators between, instead
+     * of letting buttons float independently. Mirrors macOS / Linear UX. */
+    .island {
+        @apply inline-flex items-center gap-0.5 rounded-full p-1 ring-1 ring-zinc-200/80 dark:ring-zinc-800/70;
+        background: color-mix(in oklab, var(--color-zinc-50) 70%, transparent);
+    }
+    .dark .island {
+        background: color-mix(in oklab, var(--color-zinc-900) 60%, transparent);
+    }
+
+    /* Soft vertical divider — used between bilingual document panes.
+     * Not a border — a hairline gradient that fades top + bottom so the
+     * eye doesn't lock onto a hard horizontal line. */
+    .divider-soft {
+        background-image: linear-gradient(
+            to bottom,
+            transparent 0%,
+            color-mix(in oklab, var(--color-zinc-300) 60%, transparent) 8%,
+            color-mix(in oklab, var(--color-zinc-300) 60%, transparent) 92%,
+            transparent 100%
+        );
+        width: 1px;
+        flex-shrink: 0;
+    }
+    .dark .divider-soft {
+        background-image: linear-gradient(
+            to bottom,
+            transparent 0%,
+            color-mix(in oklab, var(--color-zinc-700) 70%, transparent) 8%,
+            color-mix(in oklab, var(--color-zinc-700) 70%, transparent) 92%,
+            transparent 100%
+        );
+    }
+
+    /* Reading-optimized prose — for the English translation pane.
+     * Serif body matches the legal "this is a real document" register,
+     * generous leading, balanced line length, tabular figures so
+     * amounts and percentages don't shift mid-paragraph. */
+    .text-prose {
+        font-family: var(--font-serif);
+        font-size: 14.5px;
+        line-height: 1.75;
+        color: var(--color-zinc-900);
+        font-variant-numeric: tabular-nums;
+        max-width: 68ch;
+    }
+    .dark .text-prose {
+        color: var(--color-zinc-100);
+    }
+    .text-prose p {
+        margin-bottom: 0.875rem;
+    }
+
+    /* Notice row — subtler, icon-led replacement for raw amber alerts.
+     * Used by the translation-warnings panel. */
+    .notice-row {
+        @apply flex items-start gap-2.5 rounded-[0.625rem] px-3 py-2.5 text-[12px];
+        background: color-mix(in oklab, var(--color-warning-soft) 50%, transparent);
+        color: var(--color-warning);
+        border: 1px solid color-mix(in oklab, var(--color-warning) 20%, transparent);
+    }
+    .dark .notice-row {
+        background: color-mix(in oklab, var(--color-warning-soft) 30%, transparent);
+    }
+
+    /* Eyebrow tag — micro-pill above pane headings in the bilingual view.
+     * Tighter than .eyebrow; sits inline with the pane title. */
+    .eyebrow-tag {
+        @apply inline-flex items-center gap-1.5 rounded-full px-2 py-[3px] text-[9px] font-semibold uppercase tracking-[0.18em] text-zinc-500 ring-1 ring-zinc-200 dark:text-zinc-400 dark:ring-zinc-800;
     }
 }
 
@@ -52,15 +299,531 @@
 }
 
 [data-flux-label] {
-    @apply  !mb-0 !leading-tight;
+    @apply !mb-0 !leading-tight;
 }
 
 input:focus[data-flux-control],
 textarea:focus[data-flux-control],
 select:focus[data-flux-control] {
-    @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
+    @apply outline-hidden ring-2 ring-offset-2;
+    --tw-ring-color: var(--color-accent);
+    --tw-ring-offset-color: var(--color-paper);
 }
 
-/* \[:where(&)\]:size-4 {
-    @apply size-4;
-} */
+/* ─────────────────────────────────────────────────────────────────────
+   Voice dictation — see resources/views/pages/lawyer/⚡chat.blade.php
+   for the JS that drives these styles. Web Speech API based.
+   ──────────────────────────────────────────────────────────────────── */
+.speech-host { position: relative; }
+
+.speech-mic {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 0.9rem;
+    background: rgba(15, 41, 66, 0.06);
+    color: #0F2942;
+    border: 1px solid rgba(15, 41, 66, 0.18);
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
+    font-family: inherit;
+    line-height: 1;
+    user-select: none;
+}
+.speech-mic:hover { background: rgba(15, 41, 66, 0.12); }
+.speech-mic:focus-visible { outline: 2px solid #0F2942; outline-offset: 2px; }
+
+.speech-mic-compact {
+    padding: 0.6rem;
+    gap: 0;
+    height: 38px;
+    width: 38px;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.speech-mic-compact .speech-mic-label { display: none; }
+
+.speech-mic.is-listening {
+    background: #DC2626;
+    color: #fff;
+    border-color: #B91C1C;
+    animation: speechPulse 1.4s ease-in-out infinite;
+}
+.speech-mic.is-listening:hover { background: #B91C1C; }
+.speech-mic.is-listening .speech-mic-icon { animation: speechBob 0.6s ease-in-out infinite alternate; }
+
+@keyframes speechPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
+    50%      { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+}
+@keyframes speechBob {
+    from { transform: scale(1); }
+    to   { transform: scale(1.18); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .speech-mic.is-listening, .speech-mic.is-listening .speech-mic-icon { animation: none; }
+}
+
+.speech-status {
+    font-family: ui-monospace, monospace;
+    letter-spacing: 0.02em;
+}
+.speech-status[data-state="listening"] { color: #B91C1C; }
+.speech-status[data-state="error"]     { color: #B91C1C; }
+.speech-status[data-state="ready"]     { color: #15803D; }
+
+html.dark .speech-mic {
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.86);
+    border-color: rgba(255,255,255,0.14);
+}
+html.dark .speech-mic:hover { background: rgba(255,255,255,0.12); }
+
+.speech-mic-disabled {
+    background: rgba(180, 80, 80, 0.08) !important;
+    color: #B91C1C !important;
+    border-color: rgba(220, 38, 38, 0.32) !important;
+    cursor: help;
+    position: relative;
+    overflow: visible;
+}
+.speech-mic-disabled:hover {
+    background: rgba(220, 38, 38, 0.16) !important;
+}
+/* Diagonal strike across the icon, so the disabled state is unmistakable
+   at a glance — the compact reply-composer mic has no text label to
+   show "unavailable". */
+.speech-mic-disabled::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+        to top right,
+        transparent calc(50% - 0.75px),
+        currentColor calc(50% - 0.75px),
+        currentColor calc(50% + 0.75px),
+        transparent calc(50% + 0.75px)
+    );
+    border-radius: inherit;
+    opacity: 0.85;
+}
+.speech-mic-disabled .speech-mic-icon {
+    opacity: 0.7;
+}
+html.dark .speech-mic-disabled {
+    background: rgba(248, 113, 113, 0.10) !important;
+    color: #FCA5A5 !important;
+    border-color: rgba(248, 113, 113, 0.30) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+   <x-loading-button> — uses platform tokens (--color-accent, --color-paper)
+   so it matches the rest of the in-app UI.
+   ──────────────────────────────────────────────────────────────────── */
+.lb-base {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: inherit;
+    font-weight: 600;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.12s;
+    position: relative;
+    line-height: 1.1;
+    text-decoration: none;
+    user-select: none;
+}
+.lb-base:disabled { cursor: not-allowed; opacity: 0.65; }
+.lb-base:not(:disabled):active { transform: translateY(1px); }
+.lb-xs { padding: 0.35rem 0.7rem; font-size: 12px; min-height: 30px; }
+.lb-sm { padding: 0.55rem 0.95rem; font-size: 13px; min-height: 36px; }
+.lb-md { padding: 0.75rem 1.25rem; font-size: 14px; min-height: 40px; }
+.lb-primary {
+    background: var(--color-accent);
+    color: var(--color-accent-foreground);
+    border-color: var(--color-accent);
+}
+.lb-primary:not(:disabled):hover {
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+}
+.lb-ghost {
+    background: transparent;
+    color: var(--color-ink);
+    border-color: var(--color-zinc-300);
+}
+.lb-ghost:not(:disabled):hover {
+    background: var(--color-paper-edge);
+    border-color: var(--color-zinc-400);
+}
+html.dark .lb-ghost { border-color: var(--color-zinc-700); }
+html.dark .lb-ghost:not(:disabled):hover { background: var(--color-paper-edge); }
+.lb-danger {
+    background: var(--color-danger);
+    color: #fff;
+    border-color: var(--color-danger);
+}
+.lb-danger:not(:disabled):hover { opacity: 0.92; }
+.lb-content { display: inline-flex; align-items: center; gap: 0.45rem; }
+.lb-icon { width: 16px; height: 16px; flex-shrink: 0; }
+.lb-label { white-space: nowrap; }
+.lb-spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid currentColor; border-top-color: transparent;
+    animation: lb-spin 0.7s linear infinite; flex-shrink: 0;
+}
+@keyframes lb-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .lb-spinner { animation-duration: 1.6s; } }
+
+/* ─────────────────────────────────────────────────────────────────────
+   Mobile-first chat layout — uses platform tokens, matching the warm
+   parchment / deep-navy / gold-accent palette of the rest of the app.
+   ──────────────────────────────────────────────────────────────────── */
+.chat-shell {
+    display: flex; flex-direction: column;
+    /* The page is nested inside Flux's app layout, which renders a
+       sticky <flux:header> on mobile (~56-64px tall) and a sticky
+       <flux:sidebar> on desktop. Plain 100dvh would push the composer
+       below the visible viewport on mobile. We subtract a CSS custom
+       property --app-chrome-offset that JS sets to the actual header
+       height on first paint. Falls back to 56px (the Flux default
+       mobile header height) when JS hasn't measured yet. */
+    height: calc(100dvh - var(--app-chrome-offset, 56px));
+    min-height: 0;
+    background: var(--color-paper);
+}
+@media (min-width: 1024px) {
+    .chat-shell {
+        flex-direction: row;
+        gap: 0;
+        padding: 0;
+        /* Desktop: no flux:header on this breakpoint — uses full viewport. */
+        height: 100dvh;
+    }
+}
+.chat-topbar {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.65rem 0.85rem;
+    background: var(--color-paper);
+    border-bottom: 1px solid var(--color-paper-edge);
+    flex-shrink: 0; min-height: 56px;
+}
+@media (min-width: 1024px) { .chat-topbar { display: none; } }
+.chat-topbar-title {
+    flex: 1; min-width: 0;
+    font-family: var(--font-serif);
+    font-size: 15px; font-weight: 600;
+    color: var(--color-ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-iconbtn {
+    width: 40px; height: 40px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 10px; border: 1px solid transparent;
+    background: transparent;
+    color: var(--color-ink);
+    cursor: pointer; flex-shrink: 0;
+    transition: background 0.15s;
+}
+.chat-iconbtn:hover { background: var(--color-paper-edge); }
+.chat-iconbtn:active { background: var(--color-parchment); }
+.chat-sidebar {
+    display: flex; flex-direction: column;
+    background: var(--color-paper);
+    border-inline-end: 1px solid var(--color-paper-edge);
+    width: min(85vw, 320px);
+    height: 100%; flex-shrink: 0;
+    overflow: hidden;
+    position: fixed;
+    inset-block: 0; inset-inline-start: 0;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease-out;
+    z-index: 40;
+    box-shadow: 0 12px 40px -12px rgba(26, 35, 50, 0.18);
+}
+:where(html[dir="rtl"]) .chat-sidebar { transform: translateX(100%); }
+.chat-sidebar.is-open { transform: translateX(0); }
+@media (min-width: 1024px) {
+    .chat-sidebar {
+        position: static; transform: none !important;
+        box-shadow: none; width: 280px;
+    }
+}
+.chat-sidebar-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(26, 35, 50, 0.42);
+    z-index: 35;
+    animation: fade-in 0.18s ease-out;
+}
+.chat-sidebar-backdrop.is-open { display: block; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (min-width: 1024px) { .chat-sidebar-backdrop { display: none !important; } }
+.chat-main {
+    display: flex; flex-direction: column;
+    flex: 1; min-width: 0; min-height: 0;
+    background: var(--color-paper-edge);
+}
+.chat-header { display: none; }
+@media (min-width: 1024px) {
+    .chat-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0.85rem 1.5rem;
+        background: var(--color-paper);
+        border-bottom: 1px solid var(--color-paper-edge);
+        gap: 1rem;
+    }
+}
+.chat-messages {
+    flex: 1; min-height: 0; overflow-y: auto;
+    padding: 1rem 0.85rem 1.25rem;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+}
+@media (min-width: 768px) { .chat-messages { padding: 1.5rem 2rem; } }
+.chat-msg-row {
+    display: flex; gap: 0.65rem; margin-bottom: 1.1rem; max-width: 100%;
+}
+.chat-msg-row.is-user { flex-direction: row-reverse; }
+.chat-msg-avatar {
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--color-parchment);
+    color: var(--color-accent-content);
+    font-family: var(--font-serif);
+    font-size: 14px;
+    margin-top: 4px;
+}
+.chat-msg-row.is-user .chat-msg-avatar {
+    background: var(--surface-deep);
+    color: var(--surface-deep-fg);
+    font-family: var(--font-sans);
+    font-size: 11px; font-weight: 600;
+}
+.chat-msg-row.is-refusal .chat-msg-avatar {
+    background: var(--color-warning-soft);
+    color: var(--color-warning);
+}
+.chat-msg-bubble {
+    min-width: 0; flex: 1;
+    border-radius: 14px;
+    border: 1px solid var(--color-paper-edge);
+    background: var(--color-paper);
+    padding: 0.85rem 1rem;
+    font-family: var(--font-serif);
+    font-size: 14.5px; line-height: 1.7;
+    color: var(--color-ink);
+    word-wrap: break-word; overflow-wrap: anywhere;
+    max-width: calc(100% - 50px);
+}
+.chat-msg-row.is-user .chat-msg-bubble {
+    background: var(--surface-deep);
+    color: var(--surface-deep-fg);
+    border-color: var(--surface-deep);
+    font-family: var(--font-sans);
+    font-size: 14px; line-height: 1.6;
+}
+.chat-msg-row.is-refusal .chat-msg-bubble {
+    background: var(--color-warning-soft);
+    border-color: var(--color-warning);
+    color: var(--color-warning);
+}
+.chat-msg-bubble pre {
+    margin: 0; white-space: pre-wrap; font: inherit; color: inherit;
+}
+.chat-thinking {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--color-zinc-500);
+    margin-bottom: 0.5rem;
+}
+.chat-thinking-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--color-accent);
+    animation: chat-pulse 1.2s ease-in-out infinite;
+}
+@keyframes chat-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.85); }
+    50%      { opacity: 1;    transform: scale(1.0); }
+}
+/* ─────────────────────────────────────────────────────────────────────
+   Composer — WhatsApp / Telegram pattern.
+   • Pill-shaped input on the start side. Textarea grows vertically with
+     content (1 → 6 rows). Mic icon sits INSIDE the pill at the end of
+     the input so it shares the input's visual container.
+   • Send button is a separate circle OUTSIDE the pill on the trailing
+     side. RTL-aware via inset-inline rules in the flex order.
+   • No "Press Enter to send" hint — IM convention is universal, and the
+     placeholder + behavior speak for themselves.
+   ────────────────────────────────────────────────────────────────── */
+.chat-composer {
+    background: var(--color-paper);
+    border-top: 1px solid var(--color-paper-edge);
+    padding: 0.55rem 0.7rem calc(0.55rem + env(safe-area-inset-bottom, 0px));
+    flex-shrink: 0;
+    position: relative;
+}
+@media (min-width: 768px) {
+    .chat-composer {
+        padding: 0.85rem 1.5rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+    }
+}
+
+/* Row holding the pill + send button. Bottom-aligned so when the pill
+   grows in height the send button stays anchored to the last line of
+   text (just like WhatsApp). */
+.chat-composer-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.5rem;
+}
+
+/* The pill itself — wraps the textarea + the mic. Uses <label> so
+   tapping anywhere in the pill focuses the textarea. Rounded to the
+   default ~22px on a single-row composer; the border-radius shrinks
+   on multi-row content because we don't want a sausage shape. */
+.chat-composer-pill {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: flex-end;
+    gap: 0.25rem;
+    background: var(--color-paper-edge);
+    border: 1px solid transparent;
+    border-radius: 22px;
+    padding: 0.3rem 0.5rem 0.3rem 0.85rem;
+    transition: background 0.12s, border-color 0.12s;
+    cursor: text;
+    /* Drop-shadow on focus instead of an outline ring — feels more IM-ish. */
+}
+:where(html[dir="rtl"]) .chat-composer-pill {
+    padding: 0.3rem 0.85rem 0.3rem 0.5rem;
+}
+.chat-composer-pill:focus-within {
+    background: var(--color-paper);
+    border-color: var(--color-accent);
+}
+
+/* Textarea: invisible chrome, fills the pill, auto-grows. */
+.chat-composer-textarea {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    min-height: 32px;            /* single-row height aligned with the mic */
+    max-height: 144px;           /* ~6 lines, then scrolls inside the pill */
+    resize: none;
+    border: 0;
+    background: transparent;
+    padding: 0.35rem 0;
+    font: inherit;
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--color-ink);
+    outline: none;
+    box-shadow: none;
+}
+.chat-composer-textarea::placeholder { color: var(--color-zinc-500); }
+.chat-composer-textarea:focus { outline: none; box-shadow: none; }
+
+/* Mic — INSIDE the pill, end-aligned. Smaller than the send button
+   because it's a sub-action, not the primary one. */
+.chat-composer-mic {
+    flex-shrink: 0;
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    color: var(--color-zinc-500);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, transform 0.12s;
+    margin-bottom: 1px; /* optical alignment with textarea baseline */
+}
+.chat-composer-mic:hover { background: rgba(168, 118, 58, 0.12); color: var(--color-accent); }
+.chat-composer-mic:active { transform: scale(0.94); }
+.chat-composer-mic.is-listening {
+    background: var(--color-danger);
+    color: #fff;
+    animation: chat-mic-pulse 1.4s ease-in-out infinite;
+}
+@keyframes chat-mic-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0.45); }
+    50%      { box-shadow: 0 0 0 8px rgba(185, 28, 28, 0); }
+}
+
+/* Send — circle OUTSIDE the pill, 40px so it's the visual anchor of the
+   row. Matches Telegram (and WhatsApp's "send" state when text exists). */
+.chat-composer-send {
+    flex-shrink: 0;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: var(--color-accent);
+    color: var(--color-accent-foreground);
+    cursor: pointer;
+    transition: background 0.15s, transform 0.12s;
+}
+.chat-composer-send:not(:disabled):hover { background: var(--color-accent-hover); }
+.chat-composer-send:not(:disabled):active { transform: scale(0.94); }
+.chat-composer-send:disabled { background: var(--color-zinc-400); cursor: not-allowed; }
+.chat-composer-send svg {
+    /* Tilt the paper-plane like Telegram does — points toward send direction. */
+    transform: translateX(-1px) rotate(0deg);
+}
+:where(html[dir="rtl"]) .chat-composer-send svg {
+    transform: scaleX(-1) translateX(-1px);
+}
+.chat-empty {
+    flex: 1; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 1.25rem 0.85rem 2rem;
+    overflow-y: auto;
+}
+.chat-empty-card {
+    width: 100%; max-width: 520px;
+    background: var(--color-paper);
+    border: 1px solid var(--color-paper-edge);
+    border-radius: 16px;
+    padding: 1.5rem 1.25rem;
+    box-shadow: 0 8px 28px -16px rgba(26, 35, 50, 0.12);
+}
+@media (min-width: 768px) { .chat-empty-card { padding: 2.25rem 2rem; } }
+.chat-session-list {
+    padding: 0.5rem; flex: 1; overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.chat-session-item {
+    display: block; width: 100%; text-align: start;
+    padding: 0.75rem 0.85rem; border-radius: 10px;
+    background: transparent; border: 1px solid transparent;
+    cursor: pointer; transition: background 0.12s;
+}
+.chat-session-item:hover { background: var(--color-paper-edge); }
+.chat-session-item.is-active {
+    background: var(--color-parchment);
+    border-color: var(--color-parchment-edge);
+}
+.chat-session-title {
+    display: block; font-size: 13px; font-weight: 500;
+    color: var(--color-ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-session-meta {
+    display: flex; justify-content: space-between; gap: 0.5rem; margin-top: 0.35rem;
+}
+.chat-session-meta span {
+    font-size: 10px;
+    color: var(--color-zinc-500);
+}

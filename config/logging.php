@@ -58,6 +58,42 @@ return [
             'ignore_exceptions' => false,
         ],
 
+        // ─────────────────────────────────────────────────────────────────
+        // Errors-only channel.
+        // Isolates ERROR / CRITICAL / ALERT / EMERGENCY records from the
+        // chatty default log so an alerting integration (Sentry, Slack
+        // webhook, Better Stack) only fires on real problems.
+        //
+        // This is a `stack` so multiple sinks can attach. The default is
+        // file-only; set LOG_ERRORS_STACK=errors_file,slack or
+        // LOG_ERRORS_STACK=errors_file,sentry once those channels are
+        // configured to fan out alerts.
+        // ─────────────────────────────────────────────────────────────────
+        'errors' => [
+            'driver' => 'stack',
+            'channels' => explode(',', (string) env('LOG_ERRORS_STACK', 'errors_file')),
+            'ignore_exceptions' => false,
+        ],
+
+        'errors_file' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/errors.log'),
+            'level' => 'error',
+            'days' => env('LOG_ERRORS_DAYS', 30),
+            'replace_placeholders' => true,
+        ],
+
+        // Sentry channel — registered as a config block so it shows up in
+        // LOG_ERRORS_STACK even before sentry/sentry-laravel is installed.
+        // Laravel will only resolve it when actually used, so it's a no-op
+        // until you run `composer require sentry/sentry-laravel` and set
+        // SENTRY_LARAVEL_DSN.
+        'sentry' => [
+            'driver' => 'sentry',
+            'level' => env('SENTRY_LOG_LEVEL', 'error'),
+            'bubble' => true,
+        ],
+
         'single' => [
             'driver' => 'single',
             'path' => storage_path('logs/laravel.log'),
@@ -121,6 +157,19 @@ return [
         'null' => [
             'driver' => 'monolog',
             'handler' => NullHandler::class,
+        ],
+
+        // Dedicated channel for AI/external-API observability events. Anything
+        // that touches Anthropic, Voyage, OpenAI, or eastlaws should log here
+        // with structured context — that way ops can tail one file to spot
+        // latency regressions, rate-limit hits, or authentication issues
+        // without sifting through framework noise.
+        'ai' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/ai.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 30,
+            'replace_placeholders' => true,
         ],
 
         'emergency' => [

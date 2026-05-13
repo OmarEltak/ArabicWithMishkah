@@ -53,8 +53,19 @@ jobs:
       - name: Generate Application Key
         run: php artisan key:generate
 
+      # The audit-log HMAC chain requires its own key. In CI we generate
+      # a throwaway key so audit-touching tests can sign rows without
+      # falling back to APP_KEY (production refuses that fallback).
+      - name: Generate Audit Key
+        run: |
+          AUDIT_KEY=$(php -r "echo bin2hex(random_bytes(32));")
+          echo "APP_AUDIT_KEY=${AUDIT_KEY}" >> .env
+
+      - name: Run Migrations
+        run: php artisan migrate --force
+
       - name: Build Assets
         run: npm run build
 
       - name: Run Tests
-        run: ./vendor/bin/pest
+        run: ./vendor/bin/pest --parallel

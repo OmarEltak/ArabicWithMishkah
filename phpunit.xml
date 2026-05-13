@@ -32,5 +32,14 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Force AI services into mock mode for deterministic tests.
+             Live API calls in tests are slow, flaky, and burn API credits. -->
+        <env name="ANTHROPIC_API_KEY" value="" force="true"/>
+        <env name="GROQ_API_KEY" value="" force="true"/>
+        <env name="VOYAGE_API_KEY" value="" force="true"/>
+        <env name="OPENAI_API_KEY" value="" force="true"/>
+        <env name="EASTLAWS_ENABLED" value="false" force="true"/>
+        <env name="LLM_PROVIDER" value="anthropic" force="true"/>
+        <env name="EMBEDDING_PROVIDER" value="mock" force="true"/>
     </php>
 </phpunit>

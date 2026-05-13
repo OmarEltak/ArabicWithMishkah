@@ -1,34 +1,53 @@
+@php($_locale = app()->getLocale())
+@php($_isRtl = in_array($_locale, ['ar', 'fa', 'he', 'ur'], true) || str_starts_with((string) $_locale, 'ar'))
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', $_locale) }}" dir="{{ $_isRtl ? 'rtl' : 'ltr' }}" class="dark">
     <head>
         @include('partials.head')
     </head>
-    <body class="min-h-screen bg-white dark:bg-zinc-800">
-        <flux:sidebar sticky collapsible="mobile" class="border-e border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900">
-            <flux:sidebar.header>
-                <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" wire:navigate />
+    <body class="min-h-screen surface-paper">
+        <flux:sidebar sticky collapsible="mobile" class="border-e bg-white/60 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/60">
+            <flux:sidebar.header class="!pb-3">
+                <x-app-logo :sidebar="true" href="{{ route('dashboard') }}" />
                 <flux:sidebar.collapse class="lg:hidden" />
             </flux:sidebar.header>
 
             <flux:sidebar.nav>
-                <flux:sidebar.group :heading="__('Platform')" class="grid">
+                <flux:sidebar.group :heading="__('Drafting')">
+                    <flux:sidebar.item icon="pencil-square" :href="route('lawyer.chat')" :current="request()->routeIs('lawyer.chat')" wire:navigate>
+                        {{ __('Workspace') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="document-text" :href="route('lawyer.contracts')" :current="request()->routeIs('lawyer.contracts')" wire:navigate>
+                        {{ __('Contracts') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="rectangle-stack" :href="route('lawyer.templates')" :current="request()->routeIs('lawyer.templates')" wire:navigate>
+                        {{ __('Templates') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+
+                <flux:sidebar.group :heading="__('Knowledge')">
+                    <flux:sidebar.item icon="magnifying-glass" :href="route('lawyer.law-search')" :current="request()->routeIs('lawyer.law-search')" wire:navigate>
+                        {{ __('Search Laws') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="building-library" :href="route('lawyer.knowledge')" :current="request()->routeIs('lawyer.knowledge')" wire:navigate>
+                        {{ __('Knowledge base') }}
+                    </flux:sidebar.item>
+                </flux:sidebar.group>
+
+                <flux:sidebar.group :heading="__('Operations')">
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
-                        {{ __('Dashboard') }}
+                        {{ __('Overview') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="chart-bar" :href="route('lawyer.usage')" :current="request()->routeIs('lawyer.usage')" wire:navigate>
+                        {{ __('Usage & cost') }}
+                    </flux:sidebar.item>
+                    <flux:sidebar.item icon="shield-check" :href="route('lawyer.audit')" :current="request()->routeIs('lawyer.audit')" wire:navigate>
+                        {{ __('Audit log') }}
                     </flux:sidebar.item>
                 </flux:sidebar.group>
             </flux:sidebar.nav>
 
             <flux:spacer />
-
-            <flux:sidebar.nav>
-                <flux:sidebar.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit" target="_blank">
-                    {{ __('Repository') }}
-                </flux:sidebar.item>
-
-                <flux:sidebar.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire" target="_blank">
-                    {{ __('Documentation') }}
-                </flux:sidebar.item>
-            </flux:sidebar.nav>
 
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </flux:sidebar>

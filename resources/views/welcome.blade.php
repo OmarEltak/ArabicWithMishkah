@@ -1,202 +1,1685 @@
+<?php
+
+use App\Models\ContractTemplate;
+use App\Models\LegalDocument;
+use Illuminate\Support\Facades\Cache;
+
+// Cache the homepage counts for an hour — crawler spikes (Googlebot,
+// link previews) would otherwise run the same three aggregates on every
+// hit. `legal:seed-catalog` and ingestion code can invalidate via
+// `Cache::forget('welcome.counts')` if a fresh count is needed sooner.
+[$docCount, $tplCount, $jurisdictionCount] = Cache::remember('welcome.counts', 3600, function () {
+    $officialSlugs = (array) config('legal_sources.official_slugs', ['eastlaws']);
+
+    return [
+        LegalDocument::query()->count(),
+        ContractTemplate::query()->where('is_system', true)->count(),
+        LegalDocument::query()
+            ->whereNotNull('jurisdiction')
+            ->whereIn('source', $officialSlugs)
+            ->distinct('jurisdiction')
+            ->count('jurisdiction'),
+    ];
+});
+
+$locale = app()->getLocale();
+$isAr = $locale === 'ar';
+$dir = $isAr ? 'rtl' : 'ltr';
+$themeClass = request()->cookie('theme') === 'dark' ? 'dark' : '';
+$canonical = url('/');
+
+$metaTitle = $isAr
+    ? 'My-lawyer · صياغة العقود بالذكاء الاصطناعي تحت القانون المصري'
+    : 'My-lawyer · AI contract drafting under Egyptian law';
+$metaDesc = $isAr
+    ? 'صياغة عقود ثنائية اللغة مرتبطة بالقانون المدني المصري وقوانين الشركات والعمل. توثيق الاستشهادات وقفل المصطلحات. توسعنا الإقليمي قيد التطوير.'
+    : 'AI-grounded bilingual contract drafting under Egyptian Civil Code and adjacent statutes. Citation-verified, glossary-locked. Regional expansion in active development.';
+
+$lastUpdated = '2026-05-10';
+$jsonLd = json_encode([
+    '@context' => 'https://schema.org',
+    '@graph' => [
+        [
+            '@type' => 'SoftwareApplication',
+            'name' => 'My-lawyer',
+            'applicationCategory' => 'LegalService',
+            'operatingSystem' => 'Web',
+            'description' => $metaDesc,
+            'url' => $canonical,
+            'dateModified' => $lastUpdated,
+            'offers' => ['@type' => 'Offer', 'price' => '0', 'priceCurrency' => 'USD'],
+            'featureList' => [
+                'Bilingual Arabic/English contract drafting',
+                'Citation-verified clauses',
+                '11 MENA jurisdictions',
+                'Civil-law glossary lock',
+                'Side-by-side bilingual export',
+            ],
+            'inLanguage' => ['ar', 'en'],
+        ],
+        [
+            '@type' => 'Organization',
+            'name' => 'My-lawyer',
+            'url' => $canonical,
+            'description' => 'AI contract drafting for MENA corporate counsel.',
+            'sameAs' => [
+                'https://github.com/OmarEltak/bilingual-legal-translation',
+            ],
+        ],
+        [
+            '@type' => 'HowTo',
+            'name' => 'How to draft a bilingual MENA contract with citation verification',
+            'description' => 'Draft a contract in Arabic, ground every clause in the controlling civil code, and export bilingually.',
+            'totalTime' => 'PT1M',
+            'step' => [
+                ['@type' => 'HowToStep', 'position' => 1, 'name' => 'Brief',                'text' => 'Upload your brief or answer a few questions about the deal and jurisdiction.'],
+                ['@type' => 'HowToStep', 'position' => 2, 'name' => 'Draft in Arabic',     'text' => 'My-lawyer drafts the contract in Arabic using jurisdiction-specific language and structure, picking civil-code articles and locking civil-law terminology.'],
+                ['@type' => 'HowToStep', 'position' => 3, 'name' => 'Citations verified', 'text' => 'Every clause is matched to the controlling statute. Unverifiable citations are flagged before finalization.'],
+                ['@type' => 'HowToStep', 'position' => 4, 'name' => 'Bilingual export',    'text' => 'Export Arabic and English side-by-side as PDF or Word, with citations preserved and a language-prevailing clause auto-appended.'],
+            ],
+        ],
+        [
+            '@type' => 'ItemList',
+            'name' => 'MENA jurisdictions covered',
+            'numberOfItems' => 11,
+            'itemListElement' => [
+                ['@type' => 'ListItem', 'position' => 1,  'name' => 'Egypt',                  'url' => url('/jurisdictions/EG')],
+                ['@type' => 'ListItem', 'position' => 2,  'name' => 'Saudi Arabia',           'url' => url('/jurisdictions/SA')],
+                ['@type' => 'ListItem', 'position' => 3,  'name' => 'United Arab Emirates',   'url' => url('/jurisdictions/AE')],
+                ['@type' => 'ListItem', 'position' => 4,  'name' => 'Kuwait',                 'url' => url('/jurisdictions/KW')],
+                ['@type' => 'ListItem', 'position' => 5,  'name' => 'Qatar',                  'url' => url('/jurisdictions/QA')],
+                ['@type' => 'ListItem', 'position' => 6,  'name' => 'Bahrain',                'url' => url('/jurisdictions/BH')],
+                ['@type' => 'ListItem', 'position' => 7,  'name' => 'Oman',                   'url' => url('/jurisdictions/OM')],
+                ['@type' => 'ListItem', 'position' => 8,  'name' => 'Jordan',                 'url' => url('/jurisdictions/JO')],
+                ['@type' => 'ListItem', 'position' => 9,  'name' => 'Lebanon',                'url' => url('/jurisdictions/LB')],
+                ['@type' => 'ListItem', 'position' => 10, 'name' => 'Tunisia',                'url' => url('/jurisdictions/TN')],
+                ['@type' => 'ListItem', 'position' => 11, 'name' => 'Libya',                  'url' => url('/jurisdictions/LY')],
+            ],
+        ],
+        [
+            '@type' => 'BreadcrumbList',
+            'itemListElement' => [
+                ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => url('/')],
+            ],
+        ],
+    ],
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+$jurisdictions = [
+    ['iso' => 'EG', 'flag' => '🇪🇬', 'en' => 'Egypt',        'ar' => 'مصر',                       'note_en' => 'Civil Code',        'note_ar' => 'القانون المدني',          'cite_en' => 'Law 131/1948',        'cite_ar' => '١٣١/١٩٤٨'],
+    ['iso' => 'SA', 'flag' => '🇸🇦', 'en' => 'Saudi Arabia', 'ar' => 'المملكة العربية السعودية',   'note_en' => 'Civil Code',        'note_ar' => 'نظام المعاملات المدنية', 'cite_en' => 'Royal Decree M/191',  'cite_ar' => 'مرسوم ملكي م/١٩١'],
+    ['iso' => 'AE', 'flag' => '🇦🇪', 'en' => 'UAE',          'ar' => 'الإمارات',                    'note_en' => 'Civil Transactions','note_ar' => 'المعاملات المدنية',      'cite_en' => 'Federal Decree-Law No. 5/1985', 'cite_ar' => 'القانون الاتحادي ٥/١٩٨٥'],
+    ['iso' => 'KW', 'flag' => '🇰🇼', 'en' => 'Kuwait',       'ar' => 'الكويت',                     'note_en' => 'Civil Code',        'note_ar' => 'القانون المدني',          'cite_en' => 'Law 67/1980',         'cite_ar' => '٦٧/١٩٨٠'],
+    ['iso' => 'QA', 'flag' => '🇶🇦', 'en' => 'Qatar',        'ar' => 'قطر',                        'note_en' => 'Civil Code',        'note_ar' => 'القانون المدني',          'cite_en' => 'Law 22/2004',         'cite_ar' => '٢٢/٢٠٠٤'],
+    ['iso' => 'BH', 'flag' => '🇧🇭', 'en' => 'Bahrain',      'ar' => 'البحرين',                    'note_en' => 'Civil Code',        'note_ar' => 'القانون المدني',          'cite_en' => 'Decree-Law 19/2001',  'cite_ar' => 'المرسوم بقانون ١٩/٢٠٠١'],
+    ['iso' => 'OM', 'flag' => '🇴🇲', 'en' => 'Oman',         'ar' => 'عُمان',                       'note_en' => 'Civil Transactions','note_ar' => 'المعاملات المدنية',      'cite_en' => 'Royal Decree 29/2013','cite_ar' => 'مرسوم سلطاني ٢٩/٢٠١٣'],
+    ['iso' => 'JO', 'flag' => '🇯🇴', 'en' => 'Jordan',       'ar' => 'الأردن',                     'note_en' => 'Civil Code',        'note_ar' => 'القانون المدني',          'cite_en' => 'Law 43/1976',         'cite_ar' => '٤٣/١٩٧٦'],
+    ['iso' => 'LB', 'flag' => '🇱🇧', 'en' => 'Lebanon',      'ar' => 'لبنان',                      'note_en' => 'Code of Obligations','note_ar' => 'قانون الموجبات والعقود', 'cite_en' => '1932',                 'cite_ar' => '١٩٣٢'],
+    ['iso' => 'TN', 'flag' => '🇹🇳', 'en' => 'Tunisia',      'ar' => 'تونس',                       'note_en' => 'Code of Obligations','note_ar' => 'مجلة الالتزامات والعقود','cite_en' => '1906',                 'cite_ar' => '١٩٠٦'],
+    ['iso' => 'LY', 'flag' => '🇱🇾', 'en' => 'Libya',        'ar' => 'ليبيا',                      'note_en' => 'Civil Code',        'note_ar' => 'القانون المدني',          'cite_en' => '1953',                 'cite_ar' => '١٩٥٣'],
+];
+
+$displayDocs = $docCount > 0 ? $docCount : 120000;
+$displayJurs = $jurisdictionCount > 0 ? $jurisdictionCount : 11;
+?>
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="{{ $locale }}" dir="{{ $dir }}" class="{{ $themeClass }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <title>{{ __('Welcome') }} - {{ config('app.name', 'Laravel') }}</title>
+    <title>{{ $metaTitle }}</title>
+    <meta name="description" content="{{ $metaDesc }}">
+    <link rel="canonical" href="{{ $canonical }}">
+    <meta name="robots" content="index, follow, max-image-preview:large">
 
-        <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ $canonical }}">
+    <meta property="og:title" content="{{ $metaTitle }}">
+    <meta property="og:description" content="{{ $metaDesc }}">
+    <meta property="og:locale" content="{{ $isAr ? 'ar_AR' : 'en_US' }}">
+    <meta property="og:locale:alternate" content="{{ $isAr ? 'en_US' : 'ar_AR' }}">
+    <meta property="og:site_name" content="My-lawyer">
 
-        @fonts
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $metaTitle }}">
+    <meta name="twitter:description" content="{{ $metaDesc }}">
 
-        <!-- Styles -->
-        <style>
-            @layer properties{@supports (((-webkit-hyphens:none)) and (not (margin-trim:inline))) or ((-moz-orient:inline) and (not (color:rgb(from red r g b)))){*,:before,:after,::backdrop{--tw-translate-x:0;--tw-translate-y:0;--tw-translate-z:0;--tw-rotate-x:initial;--tw-rotate-y:initial;--tw-rotate-z:initial;--tw-skew-x:initial;--tw-skew-y:initial;--tw-space-x-reverse:0;--tw-border-style:solid;--tw-leading:initial;--tw-font-weight:initial;--tw-shadow:0 0 #0000;--tw-shadow-color:initial;--tw-shadow-alpha:100%;--tw-inset-shadow:0 0 #0000;--tw-inset-shadow-color:initial;--tw-inset-shadow-alpha:100%;--tw-ring-color:initial;--tw-ring-shadow:0 0 #0000;--tw-inset-ring-color:initial;--tw-inset-ring-shadow:0 0 #0000;--tw-ring-inset:initial;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-offset-shadow:0 0 #0000;--tw-blur:initial;--tw-brightness:initial;--tw-contrast:initial;--tw-grayscale:initial;--tw-hue-rotate:initial;--tw-invert:initial;--tw-opacity:initial;--tw-saturate:initial;--tw-sepia:initial;--tw-drop-shadow:initial;--tw-drop-shadow-color:initial;--tw-drop-shadow-alpha:100%;--tw-drop-shadow-size:initial;--tw-duration:initial;--tw-content:""}}}@layer theme{:root,:host{--font-sans:"Instrument Sans", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";--font-serif:ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;--font-mono:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;--color-red-50:oklch(97.1% .013 17.38);--color-red-100:oklch(93.6% .032 17.717);--color-red-200:oklch(88.5% .062 18.334);--color-red-300:oklch(80.8% .114 19.571);--color-red-400:oklch(70.4% .191 22.216);--color-red-500:oklch(63.7% .237 25.331);--color-red-600:oklch(57.7% .245 27.325);--color-red-700:oklch(50.5% .213 27.518);--color-red-800:oklch(44.4% .177 26.899);--color-red-900:oklch(39.6% .141 25.723);--color-red-950:oklch(25.8% .092 26.042);--color-orange-50:oklch(98% .016 73.684);--color-orange-100:oklch(95.4% .038 75.164);--color-orange-200:oklch(90.1% .076 70.697);--color-orange-300:oklch(83.7% .128 66.29);--color-orange-400:oklch(75% .183 55.934);--color-orange-500:oklch(70.5% .213 47.604);--color-orange-600:oklch(64.6% .222 41.116);--color-orange-700:oklch(55.3% .195 38.402);--color-orange-800:oklch(47% .157 37.304);--color-orange-900:oklch(40.8% .123 38.172);--color-orange-950:oklch(26.6% .079 36.259);--color-amber-50:oklch(98.7% .022 95.277);--color-amber-100:oklch(96.2% .059 95.617);--color-amber-200:oklch(92.4% .12 95.746);--color-amber-300:oklch(87.9% .169 91.605);--color-amber-400:oklch(82.8% .189 84.429);--color-amber-500:oklch(76.9% .188 70.08);--color-amber-600:oklch(66.6% .179 58.318);--color-amber-700:oklch(55.5% .163 48.998);--color-amber-800:oklch(47.3% .137 46.201);--color-amber-900:oklch(41.4% .112 45.904);--color-amber-950:oklch(27.9% .077 45.635);--color-yellow-50:oklch(98.7% .026 102.212);--color-yellow-100:oklch(97.3% .071 103.193);--color-yellow-200:oklch(94.5% .129 101.54);--color-yellow-300:oklch(90.5% .182 98.111);--color-yellow-400:oklch(85.2% .199 91.936);--color-yellow-500:oklch(79.5% .184 86.047);--color-yellow-600:oklch(68.1% .162 75.834);--color-yellow-700:oklch(55.4% .135 66.442);--color-yellow-800:oklch(47.6% .114 61.907);--color-yellow-900:oklch(42.1% .095 57.708);--color-yellow-950:oklch(28.6% .066 53.813);--color-lime-50:oklch(98.6% .031 120.757);--color-lime-100:oklch(96.7% .067 122.328);--color-lime-200:oklch(93.8% .127 124.321);--color-lime-300:oklch(89.7% .196 126.665);--color-lime-400:oklch(84.1% .238 128.85);--color-lime-500:oklch(76.8% .233 130.85);--color-lime-600:oklch(64.8% .2 131.684);--color-lime-700:oklch(53.2% .157 131.589);--color-lime-800:oklch(45.3% .124 130.933);--color-lime-900:oklch(40.5% .101 131.063);--color-lime-950:oklch(27.4% .072 132.109);--color-green-50:oklch(98.2% .018 155.826);--color-green-100:oklch(96.2% .044 156.743);--color-green-200:oklch(92.5% .084 155.995);--color-green-300:oklch(87.1% .15 154.449);--color-green-400:oklch(79.2% .209 151.711);--color-green-500:oklch(72.3% .219 149.579);--color-green-600:oklch(62.7% .194 149.214);--color-green-700:oklch(52.7% .154 150.069);--color-green-800:oklch(44.8% .119 151.328);--color-green-900:oklch(39.3% .095 152.535);--color-green-950:oklch(26.6% .065 152.934);--color-emerald-50:oklch(97.9% .021 166.113);--color-emerald-100:oklch(95% .052 163.051);--color-emerald-200:oklch(90.5% .093 164.15);--color-emerald-300:oklch(84.5% .143 164.978);--color-emerald-400:oklch(76.5% .177 163.223);--color-emerald-500:oklch(69.6% .17 162.48);--color-emerald-600:oklch(59.6% .145 163.225);--color-emerald-700:oklch(50.8% .118 165.612);--color-emerald-800:oklch(43.2% .095 166.913);--color-emerald-900:oklch(37.8% .077 168.94);--color-emerald-950:oklch(26.2% .051 172.552);--color-teal-50:oklch(98.4% .014 180.72);--color-teal-100:oklch(95.3% .051 180.801);--color-teal-200:oklch(91% .096 180.426);--color-teal-300:oklch(85.5% .138 181.071);--color-teal-400:oklch(77.7% .152 181.912);--color-teal-500:oklch(70.4% .14 182.503);--color-teal-600:oklch(60% .118 184.704);--color-teal-700:oklch(51.1% .096 186.391);--color-teal-800:oklch(43.7% .078 188.216);--color-teal-900:oklch(38.6% .063 188.416);--color-teal-950:oklch(27.7% .046 192.524);--color-cyan-50:oklch(98.4% .019 200.873);--color-cyan-100:oklch(95.6% .045 203.388);--color-cyan-200:oklch(91.7% .08 205.041);--color-cyan-300:oklch(86.5% .127 207.078);--color-cyan-400:oklch(78.9% .154 211.53);--color-cyan-500:oklch(71.5% .143 215.221);--color-cyan-600:oklch(60.9% .126 221.723);--color-cyan-700:oklch(52% .105 223.128);--color-cyan-800:oklch(45% .085 224.283);--color-cyan-900:oklch(39.8% .07 227.392);--color-cyan-950:oklch(30.2% .056 229.695);--color-sky-50:oklch(97.7% .013 236.62);--color-sky-100:oklch(95.1% .026 236.824);--color-sky-200:oklch(90.1% .058 230.902);--color-sky-300:oklch(82.8% .111 230.318);--color-sky-400:oklch(74.6% .16 232.661);--color-sky-500:oklch(68.5% .169 237.323);--color-sky-600:oklch(58.8% .158 241.966);--color-sky-700:oklch(50% .134 242.749);--color-sky-800:oklch(44.3% .11 240.79);--color-sky-900:oklch(39.1% .09 240.876);--color-sky-950:oklch(29.3% .066 243.157);--color-blue-50:oklch(97% .014 254.604);--color-blue-100:oklch(93.2% .032 255.585);--color-blue-200:oklch(88.2% .059 254.128);--color-blue-300:oklch(80.9% .105 251.813);--color-blue-400:oklch(70.7% .165 254.624);--color-blue-500:oklch(62.3% .214 259.815);--color-blue-600:oklch(54.6% .245 262.881);--color-blue-700:oklch(48.8% .243 264.376);--color-blue-800:oklch(42.4% .199 265.638);--color-blue-900:oklch(37.9% .146 265.522);--color-blue-950:oklch(28.2% .091 267.935);--color-indigo-50:oklch(96.2% .018 272.314);--color-indigo-100:oklch(93% .034 272.788);--color-indigo-200:oklch(87% .065 274.039);--color-indigo-300:oklch(78.5% .115 274.713);--color-indigo-400:oklch(67.3% .182 276.935);--color-indigo-500:oklch(58.5% .233 277.117);--color-indigo-600:oklch(51.1% .262 276.966);--color-indigo-700:oklch(45.7% .24 277.023);--color-indigo-800:oklch(39.8% .195 277.366);--color-indigo-900:oklch(35.9% .144 278.697);--color-indigo-950:oklch(25.7% .09 281.288);--color-violet-50:oklch(96.9% .016 293.756);--color-violet-100:oklch(94.3% .029 294.588);--color-violet-200:oklch(89.4% .057 293.283);--color-violet-300:oklch(81.1% .111 293.571);--color-violet-400:oklch(70.2% .183 293.541);--color-violet-500:oklch(60.6% .25 292.717);--color-violet-600:oklch(54.1% .281 293.009);--color-violet-700:oklch(49.1% .27 292.581);--color-violet-800:oklch(43.2% .232 292.759);--color-violet-900:oklch(38% .189 293.745);--color-violet-950:oklch(28.3% .141 291.089);--color-purple-50:oklch(97.7% .014 308.299);--color-purple-100:oklch(94.6% .033 307.174);--color-purple-200:oklch(90.2% .063 306.703);--color-purple-300:oklch(82.7% .119 306.383);--color-purple-400:oklch(71.4% .203 305.504);--color-purple-500:oklch(62.7% .265 303.9);--color-purple-600:oklch(55.8% .288 302.321);--color-purple-700:oklch(49.6% .265 301.924);--color-purple-800:oklch(43.8% .218 303.724);--color-purple-900:oklch(38.1% .176 304.987);--color-purple-950:oklch(29.1% .149 302.717);--color-fuchsia-50:oklch(97.7% .017 320.058);--color-fuchsia-100:oklch(95.2% .037 318.852);--color-fuchsia-200:oklch(90.3% .076 319.62);--color-fuchsia-300:oklch(83.3% .145 321.434);--color-fuchsia-400:oklch(74% .238 322.16);--color-fuchsia-500:oklch(66.7% .295 322.15);--color-fuchsia-600:oklch(59.1% .293 322.896);--color-fuchsia-700:oklch(51.8% .253 323.949);--color-fuchsia-800:oklch(45.2% .211 324.591);--color-fuchsia-900:oklch(40.1% .17 325.612);--color-fuchsia-950:oklch(29.3% .136 325.661);--color-pink-50:oklch(97.1% .014 343.198);--color-pink-100:oklch(94.8% .028 342.258);--color-pink-200:oklch(89.9% .061 343.231);--color-pink-300:oklch(82.3% .12 346.018);--color-pink-400:oklch(71.8% .202 349.761);--color-pink-500:oklch(65.6% .241 354.308);--color-pink-600:oklch(59.2% .249 .584);--color-pink-700:oklch(52.5% .223 3.958);--color-pink-800:oklch(45.9% .187 3.815);--color-pink-900:oklch(40.8% .153 2.432);--color-pink-950:oklch(28.4% .109 3.907);--color-rose-50:oklch(96.9% .015 12.422);--color-rose-100:oklch(94.1% .03 12.58);--color-rose-200:oklch(89.2% .058 10.001);--color-rose-300:oklch(81% .117 11.638);--color-rose-400:oklch(71.2% .194 13.428);--color-rose-500:oklch(64.5% .246 16.439);--color-rose-600:oklch(58.6% .253 17.585);--color-rose-700:oklch(51.4% .222 16.935);--color-rose-800:oklch(45.5% .188 13.697);--color-rose-900:oklch(41% .159 10.272);--color-rose-950:oklch(27.1% .105 12.094);--color-slate-50:oklch(98.4% .003 247.858);--color-slate-100:oklch(96.8% .007 247.896);--color-slate-200:oklch(92.9% .013 255.508);--color-slate-300:oklch(86.9% .022 252.894);--color-slate-400:oklch(70.4% .04 256.788);--color-slate-500:oklch(55.4% .046 257.417);--color-slate-600:oklch(44.6% .043 257.281);--color-slate-700:oklch(37.2% .044 257.287);--color-slate-800:oklch(27.9% .041 260.031);--color-slate-900:oklch(20.8% .042 265.755);--color-slate-950:oklch(12.9% .042 264.695);--color-gray-50:oklch(98.5% .002 247.839);--color-gray-100:oklch(96.7% .003 264.542);--color-gray-200:oklch(92.8% .006 264.531);--color-gray-300:oklch(87.2% .01 258.338);--color-gray-400:oklch(70.7% .022 261.325);--color-gray-500:oklch(55.1% .027 264.364);--color-gray-600:oklch(44.6% .03 256.802);--color-gray-700:oklch(37.3% .034 259.733);--color-gray-800:oklch(27.8% .033 256.848);--color-gray-900:oklch(21% .034 264.665);--color-gray-950:oklch(13% .028 261.692);--color-zinc-50:oklch(98.5% 0 0);--color-zinc-100:oklch(96.7% .001 286.375);--color-zinc-200:oklch(92% .004 286.32);--color-zinc-300:oklch(87.1% .006 286.286);--color-zinc-400:oklch(70.5% .015 286.067);--color-zinc-500:oklch(55.2% .016 285.938);--color-zinc-600:oklch(44.2% .017 285.786);--color-zinc-700:oklch(37% .013 285.805);--color-zinc-800:oklch(27.4% .006 286.033);--color-zinc-900:oklch(21% .006 285.885);--color-zinc-950:oklch(14.1% .005 285.823);--color-neutral-50:oklch(98.5% 0 0);--color-neutral-100:oklch(97% 0 0);--color-neutral-200:oklch(92.2% 0 0);--color-neutral-300:oklch(87% 0 0);--color-neutral-400:oklch(70.8% 0 0);--color-neutral-500:oklch(55.6% 0 0);--color-neutral-600:oklch(43.9% 0 0);--color-neutral-700:oklch(37.1% 0 0);--color-neutral-800:oklch(26.9% 0 0);--color-neutral-900:oklch(20.5% 0 0);--color-neutral-950:oklch(14.5% 0 0);--color-stone-50:oklch(98.5% .001 106.423);--color-stone-100:oklch(97% .001 106.424);--color-stone-200:oklch(92.3% .003 48.717);--color-stone-300:oklch(86.9% .005 56.366);--color-stone-400:oklch(70.9% .01 56.259);--color-stone-500:oklch(55.3% .013 58.071);--color-stone-600:oklch(44.4% .011 73.639);--color-stone-700:oklch(37.4% .01 67.558);--color-stone-800:oklch(26.8% .007 34.298);--color-stone-900:oklch(21.6% .006 56.043);--color-stone-950:oklch(14.7% .004 49.25);--color-black:#000;--color-white:#fff;--spacing:.25rem;--breakpoint-sm:40rem;--breakpoint-md:48rem;--breakpoint-lg:64rem;--breakpoint-xl:80rem;--breakpoint-2xl:96rem;--container-3xs:16rem;--container-2xs:18rem;--container-xs:20rem;--container-sm:24rem;--container-md:28rem;--container-lg:32rem;--container-xl:36rem;--container-2xl:42rem;--container-3xl:48rem;--container-4xl:56rem;--container-5xl:64rem;--container-6xl:72rem;--container-7xl:80rem;--text-xs:.75rem;--text-xs--line-height:calc(1 / .75);--text-sm:.875rem;--text-sm--line-height:calc(1.25 / .875);--text-base:1rem;--text-base--line-height: 1.5 ;--text-lg:1.125rem;--text-lg--line-height:calc(1.75 / 1.125);--text-xl:1.25rem;--text-xl--line-height:calc(1.75 / 1.25);--text-2xl:1.5rem;--text-2xl--line-height:calc(2 / 1.5);--text-3xl:1.875rem;--text-3xl--line-height: 1.2 ;--text-4xl:2.25rem;--text-4xl--line-height:calc(2.5 / 2.25);--text-5xl:3rem;--text-5xl--line-height:1;--text-6xl:3.75rem;--text-6xl--line-height:1;--text-7xl:4.5rem;--text-7xl--line-height:1;--text-8xl:6rem;--text-8xl--line-height:1;--text-9xl:8rem;--text-9xl--line-height:1;--font-weight-thin:100;--font-weight-extralight:200;--font-weight-light:300;--font-weight-normal:400;--font-weight-medium:500;--font-weight-semibold:600;--font-weight-bold:700;--font-weight-extrabold:800;--font-weight-black:900;--tracking-tighter:-.05em;--tracking-tight:-.025em;--tracking-normal:0em;--tracking-wide:.025em;--tracking-wider:.05em;--tracking-widest:.1em;--leading-tight:1.25;--leading-snug:1.375;--leading-normal:1.5;--leading-relaxed:1.625;--leading-loose:2;--radius-xs:.125rem;--radius-sm:.25rem;--radius-md:.375rem;--radius-lg:.5rem;--radius-xl:.75rem;--radius-2xl:1rem;--radius-3xl:1.5rem;--radius-4xl:2rem;--shadow-2xs:0 1px #0000000d;--shadow-xs:0 1px 2px 0 #0000000d;--shadow-sm:0 1px 3px 0 #0000001a, 0 1px 2px -1px #0000001a;--shadow-md:0 4px 6px -1px #0000001a, 0 2px 4px -2px #0000001a;--shadow-lg:0 10px 15px -3px #0000001a, 0 4px 6px -4px #0000001a;--shadow-xl:0 20px 25px -5px #0000001a, 0 8px 10px -6px #0000001a;--shadow-2xl:0 25px 50px -12px #00000040;--inset-shadow-2xs:inset 0 1px #0000000d;--inset-shadow-xs:inset 0 1px 1px #0000000d;--inset-shadow-sm:inset 0 2px 4px #0000000d;--drop-shadow-xs:0 1px 1px #0000000d;--drop-shadow-sm:0 1px 2px #00000026;--drop-shadow-md:0 3px 3px #0000001f;--drop-shadow-lg:0 4px 4px #00000026;--drop-shadow-xl:0 9px 7px #0000001a;--drop-shadow-2xl:0 25px 25px #00000026;--ease-in:cubic-bezier(.4, 0, 1, 1);--ease-out:cubic-bezier(0, 0, .2, 1);--ease-in-out:cubic-bezier(.4, 0, .2, 1);--animate-spin:spin 1s linear infinite;--animate-ping:ping 1s cubic-bezier(0, 0, .2, 1) infinite;--animate-pulse:pulse 2s cubic-bezier(.4, 0, .6, 1) infinite;--animate-bounce:bounce 1s infinite;--blur-xs:4px;--blur-sm:8px;--blur-md:12px;--blur-lg:16px;--blur-xl:24px;--blur-2xl:40px;--blur-3xl:64px;--perspective-dramatic:100px;--perspective-near:300px;--perspective-normal:500px;--perspective-midrange:800px;--perspective-distant:1200px;--aspect-video:16 / 9;--default-transition-duration:.15s;--default-transition-timing-function:cubic-bezier(.4, 0, .2, 1);--default-font-family:var(--font-sans);--default-mono-font-family:var(--font-mono)}}@layer base{*,:after,:before,::backdrop{box-sizing:border-box;border:0 solid;margin:0;padding:0}::file-selector-button{box-sizing:border-box;border:0 solid;margin:0;padding:0}html,:host{-webkit-text-size-adjust:100%;tab-size:4;line-height:1.5;font-family:var(--default-font-family,ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");font-feature-settings:var(--default-font-feature-settings,normal);font-variation-settings:var(--default-font-variation-settings,normal);-webkit-tap-highlight-color:transparent}hr{height:0;color:inherit;border-top-width:1px}abbr:where([title]){-webkit-text-decoration:underline dotted;text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;-webkit-text-decoration:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,samp,pre{font-family:var(--default-mono-font-family,ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);font-feature-settings:var(--default-mono-font-feature-settings,normal);font-variation-settings:var(--default-mono-font-variation-settings,normal);font-size:1em}small{font-size:80%}sub,sup{vertical-align:baseline;font-size:75%;line-height:0;position:relative}sub{bottom:-.25em}sup{top:-.5em}table{text-indent:0;border-color:inherit;border-collapse:collapse}:-moz-focusring{outline:auto}progress{vertical-align:baseline}summary{display:list-item}ol,ul,menu{list-style:none}img,svg,video,canvas,audio,iframe,embed,object{vertical-align:middle;display:block}img,video{max-width:100%;height:auto}button,input,select,optgroup,textarea{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;opacity:1;background-color:#0000;border-radius:0}::file-selector-button{font:inherit;font-feature-settings:inherit;font-variation-settings:inherit;letter-spacing:inherit;color:inherit;opacity:1;background-color:#0000;border-radius:0}:where(select:is([multiple],[size])) optgroup{font-weight:bolder}:where(select:is([multiple],[size])) optgroup option{padding-inline-start:20px}::file-selector-button{margin-inline-end:4px}::placeholder{opacity:1}@supports (not ((-webkit-appearance:-apple-pay-button))) or (contain-intrinsic-size:1px){::placeholder{color:currentColor}@supports (color:color-mix(in lab,red,red)){::placeholder{color:color-mix(in oklab,currentcolor 50%,transparent)}}}textarea{resize:vertical}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-date-and-time-value{min-height:1lh;text-align:inherit}::-webkit-datetime-edit{display:inline-flex}::-webkit-datetime-edit-fields-wrapper{padding:0}::-webkit-datetime-edit{padding-block:0}::-webkit-datetime-edit-year-field{padding-block:0}::-webkit-datetime-edit-month-field{padding-block:0}::-webkit-datetime-edit-day-field{padding-block:0}::-webkit-datetime-edit-hour-field{padding-block:0}::-webkit-datetime-edit-minute-field{padding-block:0}::-webkit-datetime-edit-second-field{padding-block:0}::-webkit-datetime-edit-millisecond-field{padding-block:0}::-webkit-datetime-edit-meridiem-field{padding-block:0}::-webkit-calendar-picker-indicator{line-height:1}:-moz-ui-invalid{box-shadow:none}button,input:where([type=button],[type=reset],[type=submit]){appearance:button}::file-selector-button{appearance:button}::-webkit-inner-spin-button{height:auto}::-webkit-outer-spin-button{height:auto}[hidden]:where(:not([hidden=until-found])){display:none!important}}@layer components;@layer utilities{.absolute{position:absolute}.relative{position:relative}.static{position:static}.inset-0{inset:calc(var(--spacing) * 0)}.start{inset-inline-start:var(--spacing)}.ms-1{margin-inline-start:calc(var(--spacing) * 1)}.-mt-\[6\.6rem\]{margin-top:-6.6rem}.-mb-px{margin-bottom:-1px}.mb-1{margin-bottom:calc(var(--spacing) * 1)}.mb-2{margin-bottom:calc(var(--spacing) * 2)}.mb-4{margin-bottom:calc(var(--spacing) * 4)}.mb-6{margin-bottom:calc(var(--spacing) * 6)}.-ml-8{margin-left:calc(var(--spacing) * -8)}.contents{display:contents}.flex{display:flex}.hidden{display:none}.inline-block{display:inline-block}.inline-flex{display:inline-flex}.table{display:table}.aspect-\[335\/364\]{aspect-ratio:335/364}.h-1{height:calc(var(--spacing) * 1)}.h-1\.5{height:calc(var(--spacing) * 1.5)}.h-2{height:calc(var(--spacing) * 2)}.h-2\.5{height:calc(var(--spacing) * 2.5)}.h-3{height:calc(var(--spacing) * 3)}.h-3\.5{height:calc(var(--spacing) * 3.5)}.h-14{height:calc(var(--spacing) * 14)}.h-14\.5{height:calc(var(--spacing) * 14.5)}.min-h-screen{min-height:100vh}.w-1{width:calc(var(--spacing) * 1)}.w-1\.5{width:calc(var(--spacing) * 1.5)}.w-2{width:calc(var(--spacing) * 2)}.w-2\.5{width:calc(var(--spacing) * 2.5)}.w-3{width:calc(var(--spacing) * 3)}.w-3\.5{width:calc(var(--spacing) * 3.5)}.w-\[438px\]{width:438px}.w-full{width:100%}.max-w-\[335px\]{max-width:335px}.max-w-none{max-width:none}.flex-1{flex:1}.shrink-0{flex-shrink:0}.translate-y-0{--tw-translate-y:calc(var(--spacing) * 0);translate:var(--tw-translate-x) var(--tw-translate-y)}.transform{transform:var(--tw-rotate-x,) var(--tw-rotate-y,) var(--tw-rotate-z,) var(--tw-skew-x,) var(--tw-skew-y,)}.flex-col{flex-direction:column}.flex-col-reverse{flex-direction:column-reverse}.items-center{align-items:center}.justify-center{justify-content:center}.justify-end{justify-content:flex-end}.gap-3{gap:calc(var(--spacing) * 3)}.gap-4{gap:calc(var(--spacing) * 4)}:where(.space-x-1>:not(:last-child)){--tw-space-x-reverse:0;margin-inline-start:calc(calc(var(--spacing) * 1) * var(--tw-space-x-reverse));margin-inline-end:calc(calc(var(--spacing) * 1) * calc(1 - var(--tw-space-x-reverse)))}.overflow-hidden{overflow:hidden}.rounded-full{border-radius:3.40282e38px}.rounded-sm{border-radius:var(--radius-sm)}.rounded-ee-lg{border-end-end-radius:var(--radius-lg)}.rounded-es-lg{border-end-start-radius:var(--radius-lg)}.rounded-t-lg{border-top-left-radius:var(--radius-lg);border-top-right-radius:var(--radius-lg)}.rounded-br-lg{border-bottom-right-radius:var(--radius-lg)}.rounded-bl-lg{border-bottom-left-radius:var(--radius-lg)}.border{border-style:var(--tw-border-style);border-width:1px}.border-\[\#19140035\]{border-color:#19140035}.border-\[\#e3e3e0\]{border-color:#e3e3e0}.border-black{border-color:var(--color-black)}.border-transparent{border-color:#0000}.bg-\[\#1b1b18\]{background-color:#1b1b18}.bg-\[\#FDFDFC\]{background-color:#fdfdfc}.bg-\[\#dbdbd7\]{background-color:#dbdbd7}.bg-\[\#fff2f2\]{background-color:#fff2f2}.bg-white{background-color:var(--color-white)}.p-6{padding:calc(var(--spacing) * 6)}.px-5{padding-inline:calc(var(--spacing) * 5)}.py-1{padding-block:calc(var(--spacing) * 1)}.py-1\.5{padding-block:calc(var(--spacing) * 1.5)}.py-2{padding-block:calc(var(--spacing) * 2)}.pb-12{padding-bottom:calc(var(--spacing) * 12)}.text-sm{font-size:var(--text-sm);line-height:var(--tw-leading,var(--text-sm--line-height))}.text-\[13px\]{font-size:13px}.leading-\[20px\]{--tw-leading:20px;line-height:20px}.leading-normal{--tw-leading:var(--leading-normal);line-height:var(--leading-normal)}.font-medium{--tw-font-weight:var(--font-weight-medium);font-weight:var(--font-weight-medium)}.text-\[\#1B1B18\],.text-\[\#1b1b18\]{color:#1b1b18}.text-\[\#706f6c\]{color:#706f6c}.text-\[\#F3BEC7\]{color:#f3bec7}.text-\[\#F8B803\]{color:#f8b803}.text-\[\#F53003\],.text-\[\#f53003\]{color:#f53003}.text-white{color:var(--color-white)}.underline{text-decoration-line:underline}.underline-offset-4{text-underline-offset:4px}.opacity-100{opacity:1}.mix-blend-color{mix-blend-mode:color}.mix-blend-darken{mix-blend-mode:darken}.mix-blend-hard-light{mix-blend-mode:hard-light}.mix-blend-multiply{mix-blend-mode:multiply}.shadow-\[0px_0px_1px_0px_rgba\(0\,0\,0\,0\.03\)\,0px_1px_2px_0px_rgba\(0\,0\,0\,0\.06\)\]{--tw-shadow:0px 0px 1px 0px var(--tw-shadow-color,#00000008), 0px 1px 2px 0px var(--tw-shadow-color,#0000000f);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.shadow-\[inset_0px_0px_0px_1px_rgba\(26\,26\,0\,0\.16\)\]{--tw-shadow:inset 0px 0px 0px 1px var(--tw-shadow-color,#1a1a0029);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.filter{filter:var(--tw-blur,) var(--tw-brightness,) var(--tw-contrast,) var(--tw-grayscale,) var(--tw-hue-rotate,) var(--tw-invert,) var(--tw-saturate,) var(--tw-sepia,) var(--tw-drop-shadow,)}.transition-all{transition-property:all;transition-timing-function:var(--tw-ease,var(--default-transition-timing-function));transition-duration:var(--tw-duration,var(--default-transition-duration))}.transition-opacity{transition-property:opacity;transition-timing-function:var(--tw-ease,var(--default-transition-timing-function));transition-duration:var(--tw-duration,var(--default-transition-duration))}.delay-300{transition-delay:.3s}.delay-400{transition-delay:.4s}.duration-750{--tw-duration:.75s;transition-duration:.75s}.\[--stroke-color\:\#1B1B18\]{--stroke-color:#1b1b18}.not-has-\[nav\]\:hidden:not(:has(:is(nav))){display:none}.before\:absolute:before{content:var(--tw-content);position:absolute}.before\:start-\[0\.4rem\]:before{content:var(--tw-content);inset-inline-start:.4rem}.before\:top-0:before{content:var(--tw-content);top:calc(var(--spacing) * 0)}.before\:top-1\/2:before{content:var(--tw-content);top:50%}.before\:bottom-0:before{content:var(--tw-content);bottom:calc(var(--spacing) * 0)}.before\:bottom-1\/2:before{content:var(--tw-content);bottom:50%}.before\:left-\[0\.4rem\]:before{content:var(--tw-content);left:.4rem}.before\:border-l:before{content:var(--tw-content);border-left-style:var(--tw-border-style);border-left-width:1px}.before\:border-\[\#e3e3e0\]:before{content:var(--tw-content);border-color:#e3e3e0}@media(hover:hover){.hover\:border-\[\#1915014a\]:hover{border-color:#1915014a}.hover\:border-\[\#19140035\]:hover{border-color:#19140035}.hover\:border-black:hover{border-color:var(--color-black)}.hover\:bg-black:hover{background-color:var(--color-black)}}@media(min-width:64rem){.lg\:mb-0{margin-bottom:calc(var(--spacing) * 0)}.lg\:mb-6{margin-bottom:calc(var(--spacing) * 6)}.lg\:-ml-px{margin-left:-1px}.lg\:ml-0{margin-left:calc(var(--spacing) * 0)}.lg\:block{display:block}.lg\:aspect-auto{aspect-ratio:auto}.lg\:w-\[438px\]{width:438px}.lg\:max-w-4xl{max-width:var(--container-4xl)}.lg\:grow{flex-grow:1}.lg\:flex-row{flex-direction:row}.lg\:justify-center{justify-content:center}.lg\:rounded-ss-lg{border-start-start-radius:var(--radius-lg)}.lg\:rounded-ee-none{border-end-end-radius:0}.lg\:rounded-t-none{border-top-left-radius:0;border-top-right-radius:0}.lg\:rounded-r-lg{border-top-right-radius:var(--radius-lg);border-bottom-right-radius:var(--radius-lg)}.lg\:p-8{padding:calc(var(--spacing) * 8)}.lg\:p-20{padding:calc(var(--spacing) * 20)}}@media(prefers-color-scheme:dark){.dark\:border-\[\#3E3E3A\]{border-color:#3e3e3a}.dark\:border-\[\#eeeeec\]{border-color:#eeeeec}.dark\:bg-\[\#0a0a0a\]{background-color:#0a0a0a}.dark\:bg-\[\#1D0002\]{background-color:#1d0002}.dark\:bg-\[\#3E3E3A\]{background-color:#3e3e3a}.dark\:bg-\[\#161615\]{background-color:#161615}.dark\:bg-\[\#eeeeec\]{background-color:#eeeeec}.dark\:text-\[\#1C1C1A\]{color:#1c1c1a}.dark\:text-\[\#4B0600\]{color:#4b0600}.dark\:text-\[\#391800\]{color:#391800}.dark\:text-\[\#733000\]{color:#733000}.dark\:text-\[\#A1A09A\]{color:#a1a09a}.dark\:text-\[\#EDEDEC\]{color:#ededec}.dark\:text-\[\#F61500\]{color:#f61500}.dark\:text-\[\#FF4433\]{color:#f43}.dark\:text-black{color:var(--color-black)}.dark\:mix-blend-hard-light{mix-blend-mode:hard-light}.dark\:mix-blend-normal{mix-blend-mode:normal}.dark\:shadow-\[inset_0px_0px_0px_1px_\#fffaed2d\]{--tw-shadow:inset 0px 0px 0px 1px var(--tw-shadow-color,#fffaed2d);box-shadow:var(--tw-inset-shadow),var(--tw-inset-ring-shadow),var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow)}.dark\:\[--stroke-color\:\#FF750F\]{--stroke-color:#ff750f}.dark\:before\:border-\[\#3E3E3A\]:before{content:var(--tw-content);border-color:#3e3e3a}@media(hover:hover){.dark\:hover\:border-\[\#3E3E3A\]:hover{border-color:#3e3e3a}.dark\:hover\:border-\[\#62605b\]:hover{border-color:#62605b}.dark\:hover\:border-white:hover{border-color:var(--color-white)}.dark\:hover\:bg-white:hover{background-color:var(--color-white)}}}@starting-style{.starting\:opacity-0{opacity:0}}@media(prefers-reduced-motion:no-preference){@starting-style{.motion-safe\:starting\:-translate-x-\[26px\]{--tw-translate-x: -26px ;translate:var(--tw-translate-x) var(--tw-translate-y)}}@starting-style{.motion-safe\:starting\:-translate-x-\[51px\]{--tw-translate-x: -51px ;translate:var(--tw-translate-x) var(--tw-translate-y)}}@starting-style{.motion-safe\:starting\:-translate-x-\[78px\]{--tw-translate-x: -78px ;translate:var(--tw-translate-x) var(--tw-translate-y)}}@starting-style{.motion-safe\:starting\:-translate-x-\[102px\]{--tw-translate-x: -102px ;translate:var(--tw-translate-x) var(--tw-translate-y)}}@starting-style{.motion-safe\:starting\:translate-y-6{--tw-translate-y:calc(var(--spacing) * 6);translate:var(--tw-translate-x) var(--tw-translate-y)}}}}@property --tw-translate-x{syntax:"*";inherits:false;initial-value:0}@property --tw-translate-y{syntax:"*";inherits:false;initial-value:0}@property --tw-translate-z{syntax:"*";inherits:false;initial-value:0}@property --tw-rotate-x{syntax:"*";inherits:false}@property --tw-rotate-y{syntax:"*";inherits:false}@property --tw-rotate-z{syntax:"*";inherits:false}@property --tw-skew-x{syntax:"*";inherits:false}@property --tw-skew-y{syntax:"*";inherits:false}@property --tw-space-x-reverse{syntax:"*";inherits:false;initial-value:0}@property --tw-border-style{syntax:"*";inherits:false;initial-value:solid}@property --tw-leading{syntax:"*";inherits:false}@property --tw-font-weight{syntax:"*";inherits:false}@property --tw-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-shadow-color{syntax:"*";inherits:false}@property --tw-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-inset-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-inset-shadow-color{syntax:"*";inherits:false}@property --tw-inset-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-ring-color{syntax:"*";inherits:false}@property --tw-ring-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-inset-ring-color{syntax:"*";inherits:false}@property --tw-inset-ring-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-ring-inset{syntax:"*";inherits:false}@property --tw-ring-offset-width{syntax:"<length>";inherits:false;initial-value:0}@property --tw-ring-offset-color{syntax:"*";inherits:false;initial-value:#fff}@property --tw-ring-offset-shadow{syntax:"*";inherits:false;initial-value:0 0 #0000}@property --tw-blur{syntax:"*";inherits:false}@property --tw-brightness{syntax:"*";inherits:false}@property --tw-contrast{syntax:"*";inherits:false}@property --tw-grayscale{syntax:"*";inherits:false}@property --tw-hue-rotate{syntax:"*";inherits:false}@property --tw-invert{syntax:"*";inherits:false}@property --tw-opacity{syntax:"*";inherits:false}@property --tw-saturate{syntax:"*";inherits:false}@property --tw-sepia{syntax:"*";inherits:false}@property --tw-drop-shadow{syntax:"*";inherits:false}@property --tw-drop-shadow-color{syntax:"*";inherits:false}@property --tw-drop-shadow-alpha{syntax:"<percentage>";inherits:false;initial-value:100%}@property --tw-drop-shadow-size{syntax:"*";inherits:false}@property --tw-duration{syntax:"*";inherits:false}@property --tw-content{syntax:"*";inherits:false;initial-value:""}@keyframes spin{to{transform:rotate(360deg)}}@keyframes ping{75%,to{opacity:0;transform:scale(2)}}@keyframes pulse{50%{opacity:.5}}@keyframes bounce{0%,to{animation-timing-function:cubic-bezier(.8,0,1,1);transform:translateY(-25%)}50%{animation-timing-function:cubic-bezier(0,0,.2,1);transform:none}}
-        </style>
-    </head>
-    <body class="bg-[#FDFDFC] dark:bg-[#0a0a0a] text-[#1b1b18] flex p-6 lg:p-8 items-center lg:justify-center min-h-screen flex-col">
-        <header class="w-full lg:max-w-4xl max-w-[335px] text-sm mb-6 not-has-[nav]:hidden">
-            @if (Route::has('login'))
-                <nav class="flex items-center justify-end gap-4">
-                    @auth
-                        <a
-                            href="{{ route('dashboard') }}"
-                            class="inline-block px-5 py-1.5 dark:text-[#EDEDEC] border-[#19140035] hover:border-[#1915014a] border text-[#1b1b18] dark:border-[#3E3E3A] dark:hover:border-[#62605b] rounded-sm text-sm leading-normal"
-                        >
-                            Dashboard
-                        </a>
-                    @else
-                        <a
-                            href="{{ route('login') }}"
-                            class="inline-block px-5 py-1.5 dark:text-[#EDEDEC] text-[#1b1b18] border border-transparent hover:border-[#19140035] dark:hover:border-[#3E3E3A] rounded-sm text-sm leading-normal"
-                        >
-                            Log in
-                        </a>
+    <link rel="alternate" hreflang="ar" href="{{ $canonical }}?lang=ar">
+    <link rel="alternate" hreflang="en" href="{{ $canonical }}?lang=en">
+    <link rel="alternate" hreflang="x-default" href="{{ $canonical }}">
 
-                        @if (Route::has('register'))
-                            <a
-                                href="{{ route('register') }}"
-                                class="inline-block px-5 py-1.5 dark:text-[#EDEDEC] border-[#19140035] hover:border-[#1915014a] border text-[#1b1b18] dark:border-[#3E3E3A] dark:hover:border-[#62605b] rounded-sm text-sm leading-normal">
-                                Register
-                            </a>
-                        @endif
-                    @endauth
-                </nav>
-            @endif
-        </header>
-        <div class="flex items-center justify-center w-full transition-opacity opacity-100 duration-750 lg:grow starting:opacity-0">
-            <main class="flex max-w-[335px] w-full flex-col-reverse lg:max-w-4xl lg:flex-row">
-                <div class="text-[13px] leading-[20px] flex-1 p-6 pb-12 lg:p-20 bg-white dark:bg-[#161615] dark:text-[#EDEDEC] shadow-[inset_0px_0px_0px_1px_rgba(26,26,0,0.16)] dark:shadow-[inset_0px_0px_0px_1px_#fffaed2d] rounded-es-lg rounded-ee-lg lg:rounded-ss-lg lg:rounded-ee-none">
-                    <h1 class="mb-1 font-medium">Let's get started</h1>
-                    <p class="mb-2 text-[#706f6c] dark:text-[#A1A09A]">Laravel has an incredibly rich ecosystem. <br>We suggest starting with the following.</p>
-                    <ul class="flex flex-col mb-4 lg:mb-6">
-                        <li class="flex items-center gap-4 py-2 relative before:border-l before:border-[#e3e3e0] dark:before:border-[#3E3E3A] before:top-1/2 before:bottom-0 before:left-[0.4rem] before:absolute">
-                            <span class="relative py-1 bg-white dark:bg-[#161615]">
-                                <span class="flex items-center justify-center rounded-full bg-[#FDFDFC] dark:bg-[#161615] shadow-[0px_0px_1px_0px_rgba(0,0,0,0.03),0px_1px_2px_0px_rgba(0,0,0,0.06)] w-3.5 h-3.5 border dark:border-[#3E3E3A] border-[#e3e3e0]">
-                                    <span class="rounded-full bg-[#dbdbd7] dark:bg-[#3E3E3A] w-1.5 h-1.5"></span>
-                                </span>
-                            </span>
-                            <span>
-                                Read the
-                                <a href="https://laravel.com/docs" target="_blank" class="inline-flex items-center space-x-1 font-medium underline underline-offset-4 text-[#f53003] dark:text-[#FF4433] ms-1">
-                                    <span>Documentation</span>
-                                    <svg
-                                        width="10"
-                                        height="11"
-                                        viewBox="0 0 10 11"
-                                        fill="none"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        class="w-2.5 h-2.5"
-                                    >
-                                        <path
-                                            d="M7.70833 6.95834V2.79167H3.54167M2.5 8L7.5 3.00001"
-                                            stroke="currentColor"
-                                            stroke-linecap="square"
-                                        />
-                                    </svg>
-                                </a>
-                            </span>
-                        </li>
-                        <li class="flex items-center gap-4 py-2 relative before:border-l before:border-[#e3e3e0] dark:before:border-[#3E3E3A] before:bottom-1/2 before:top-0 before:start-[0.4rem] before:absolute">
-                            <span class="relative py-1 bg-white dark:bg-[#161615]">
-                                <span class="flex items-center justify-center rounded-full bg-[#FDFDFC] dark:bg-[#161615] shadow-[0px_0px_1px_0px_rgba(0,0,0,0.03),0px_1px_2px_0px_rgba(0,0,0,0.06)] w-3.5 h-3.5 border dark:border-[#3E3E3A] border-[#e3e3e0]">
-                                    <span class="rounded-full bg-[#dbdbd7] dark:bg-[#3E3E3A] w-1.5 h-1.5"></span>
-                                </span>
-                            </span>
-                            <span>
-                                Watch video tutorials at
-                                <a href="https://laracasts.com" target="_blank" class="inline-flex items-center space-x-1 font-medium underline underline-offset-4 text-[#f53003] dark:text-[#FF4433] ms-1">
-                                    <span>Laracasts</span>
-                                    <svg
-                                        width="10"
-                                        height="11"
-                                        viewBox="0 0 10 11"
-                                        fill="none"
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        class="w-2.5 h-2.5"
-                                    >
-                                        <path
-                                            d="M7.70833 6.95834V2.79167H3.54167M2.5 8L7.5 3.00001"
-                                            stroke="currentColor"
-                                            stroke-linecap="square"
-                                        />
-                                    </svg>
-                                </a>
-                            </span>
-                        </li>
-                    </ul>
-                    <ul class="flex gap-3 text-sm leading-normal">
-                        <li>
-                            <a href="https://cloud.laravel.com" target="_blank" class="inline-block dark:bg-[#eeeeec] dark:border-[#eeeeec] dark:text-[#1C1C1A] dark:hover:bg-white dark:hover:border-white hover:bg-black hover:border-black px-5 py-1.5 bg-[#1b1b18] rounded-sm border border-black text-white text-sm leading-normal">
-                                Deploy now
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-                <div class="bg-[#fff2f2] dark:bg-[#1D0002] relative lg:-ml-px -mb-px lg:mb-0 rounded-t-lg lg:rounded-t-none lg:rounded-r-lg aspect-[335/364] lg:aspect-auto w-full lg:w-[438px] shrink-0 overflow-hidden">
-                    {{-- Laravel Logo --}}
-                    <svg class="w-full text-[#F53003] dark:text-[#F61500] transition-all translate-y-0 opacity-100 max-w-none duration-750 starting:opacity-0 motion-safe:starting:translate-y-6" viewBox="0 0 438 104" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M17.2036 -3H0V102.197H49.5189V86.7187H17.2036V-3Z" fill="currentColor" />
-                        <path d="M110.256 41.6337C108.061 38.1275 104.945 35.3731 100.905 33.3681C96.8667 31.3647 92.8016 30.3618 88.7131 30.3618C83.4247 30.3618 78.5885 31.3389 74.201 33.2923C69.8111 35.2456 66.0474 37.928 62.9059 41.3333C59.7643 44.7401 57.3198 48.6726 55.5754 53.1293C53.8287 57.589 52.9572 62.274 52.9572 67.1813C52.9572 72.1925 53.8287 76.8995 55.5754 81.3069C57.3191 85.7173 59.7636 89.6241 62.9059 93.0293C66.0474 96.4361 69.8119 99.1155 74.201 101.069C78.5885 103.022 83.4247 103.999 88.7131 103.999C92.8016 103.999 96.8667 102.997 100.905 100.994C104.945 98.9911 108.061 96.2359 110.256 92.7282V102.195H126.563V32.1642H110.256V41.6337ZM108.76 75.7472C107.762 78.4531 106.366 80.8078 104.572 82.8112C102.776 84.8161 100.606 86.4183 98.0637 87.6206C95.5202 88.823 92.7004 89.4238 89.6103 89.4238C86.5178 89.4238 83.7252 88.823 81.2324 87.6206C78.7388 86.4183 76.5949 84.8161 74.7998 82.8112C73.004 80.8078 71.6319 78.4531 70.6856 75.7472C69.7356 73.0421 69.2644 70.1868 69.2644 67.1821C69.2644 64.1758 69.7356 61.3205 70.6856 58.6154C71.6319 55.9102 73.004 53.5571 74.7998 51.5522C76.5949 49.5495 78.738 47.9451 81.2324 46.7427C83.7252 45.5404 86.5178 44.9396 89.6103 44.9396C92.7012 44.9396 95.5202 45.5404 98.0637 46.7427C100.606 47.9451 102.776 49.5487 104.572 51.5522C106.367 53.5571 107.762 55.9102 108.76 58.6154C109.756 61.3205 110.256 64.1758 110.256 67.1821C110.256 70.1868 109.756 73.0421 108.76 75.7472Z" fill="currentColor" />
-                        <path d="M242.805 41.6337C240.611 38.1275 237.494 35.3731 233.455 33.3681C229.416 31.3647 225.351 30.3618 221.262 30.3618C215.974 30.3618 211.138 31.3389 206.75 33.2923C202.36 35.2456 198.597 37.928 195.455 41.3333C192.314 44.7401 189.869 48.6726 188.125 53.1293C186.378 57.589 185.507 62.274 185.507 67.1813C185.507 72.1925 186.378 76.8995 188.125 81.3069C189.868 85.7173 192.313 89.6241 195.455 93.0293C198.597 96.4361 202.361 99.1155 206.75 101.069C211.138 103.022 215.974 103.999 221.262 103.999C225.351 103.999 229.416 102.997 233.455 100.994C237.494 98.9911 240.611 96.2359 242.805 92.7282V102.195H259.112V32.1642H242.805V41.6337ZM241.31 75.7472C240.312 78.4531 238.916 80.8078 237.122 82.8112C235.326 84.8161 233.156 86.4183 230.614 87.6206C228.07 88.823 225.251 89.4238 222.16 89.4238C219.068 89.4238 216.275 88.823 213.782 87.6206C211.289 86.4183 209.145 84.8161 207.35 82.8112C205.554 80.8078 204.182 78.4531 203.236 75.7472C202.286 73.0421 201.814 70.1868 201.814 67.1821C201.814 64.1758 202.286 61.3205 203.236 58.6154C204.182 55.9102 205.554 53.5571 207.35 51.5522C209.145 49.5495 211.288 47.9451 213.782 46.7427C216.275 45.5404 219.068 44.9396 222.16 44.9396C225.251 44.9396 228.07 45.5404 230.614 46.7427C233.156 47.9451 235.326 49.5487 237.122 51.5522C238.917 53.5571 240.312 55.9102 241.31 58.6154C242.306 61.3205 242.806 64.1758 242.806 67.1821C242.805 70.1868 242.305 73.0421 241.31 75.7472Z" fill="currentColor" />
-                        <path d="M438 -3H421.694V102.197H438V-3Z" fill="currentColor" />
-                        <path d="M139.43 102.197H155.735V48.2834H183.712V32.1665H139.43V102.197Z" fill="currentColor" />
-                        <path d="M324.49 32.1665L303.995 85.794L283.498 32.1665H266.983L293.748 102.197H314.242L341.006 32.1665H324.49Z" fill="currentColor" />
-                        <path d="M376.571 30.3656C356.603 30.3656 340.797 46.8497 340.797 67.1828C340.797 89.6597 356.094 104 378.661 104C391.29 104 399.354 99.1488 409.206 88.5848L398.189 80.0226C398.183 80.031 389.874 90.9895 377.468 90.9895C363.048 90.9895 356.977 79.3111 356.977 73.269H411.075C413.917 50.1328 398.775 30.3656 376.571 30.3656ZM357.02 61.0967C357.145 59.7487 359.023 43.3761 376.442 43.3761C393.861 43.3761 395.978 59.7464 396.099 61.0967H357.02Z" fill="currentColor" />
-                    </svg>
+    <script type="application/ld+json">{!! $jsonLd !!}</script>
 
-                    {{-- 13 --}}
-                    <svg class="w-[438px] max-w-none relative -mt-[6.6rem] -ml-8 lg:ml-0 [--stroke-color:#1B1B18] dark:[--stroke-color:#FF750F]" viewBox="0 0 440 392" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <g class="mix-blend-darken dark:mix-blend-normal transition-all delay-300 opacity-100 duration-750 starting:opacity-0 text-[#1B1B18] dark:text-black">
-                            <mask id="path-1-mask" maskUnits="userSpaceOnUse" x="-0.328613" y="103" width="338" height="299" fill="black">
-                                <rect fill="white" x="-0.328613" y="103" width="338" height="299"/>
-                                <path d="M234.936 400.8C204.136 400.8 178.936 392.4 159.336 375.6C140.136 358.8 130.536 337 130.536 310.2H200.736C200.736 318.2 203.736 324.8 209.736 330C215.736 335.2 223.736 337.8 233.736 337.8C243.336 337.8 251.136 335 257.136 329.4C263.536 323.8 266.736 316.6 266.736 307.8C266.736 299.8 263.936 293.2 258.336 288C252.736 282.8 245.536 280.2 236.736 280.2H199.536V218.4H236.736C243.536 218.4 249.336 216 254.136 211.2C258.936 206.4 261.336 200.4 261.336 193.2C261.336 184.8 258.736 178.2 253.536 173.4C248.336 168.6 241.736 166.2 233.736 166.2C226.536 166.2 220.336 168.4 215.136 172.8C210.336 177.2 207.936 182.8 207.936 189.6H141.336C141.336 164.8 150.136 144.6 167.736 129C185.336 113 207.936 105 235.536 105C263.136 105 285.536 112.2 302.736 126.6C320.336 141 329.136 160 329.136 183.6C329.136 200.8 324.536 214.8 315.336 225.6C306.136 236 294.336 243.2 279.936 247.2C297.136 252 310.736 260.2 320.736 271.8C331.136 283.4 336.336 298 336.336 315.6C336.336 340.4 326.936 360.8 308.136 376.8C289.336 392.8 264.936 400.8 234.936 400.8Z"/>
-                                <path d="M26.8714 167.6H1.67139V105.2H94.6714V400.2H26.8714V167.6Z"/>
-                            </mask>
-                            <path d="M234.936 400.8C204.136 400.8 178.936 392.4 159.336 375.6C140.136 358.8 130.536 337 130.536 310.2H200.736C200.736 318.2 203.736 324.8 209.736 330C215.736 335.2 223.736 337.8 233.736 337.8C243.336 337.8 251.136 335 257.136 329.4C263.536 323.8 266.736 316.6 266.736 307.8C266.736 299.8 263.936 293.2 258.336 288C252.736 282.8 245.536 280.2 236.736 280.2H199.536V218.4H236.736C243.536 218.4 249.336 216 254.136 211.2C258.936 206.4 261.336 200.4 261.336 193.2C261.336 184.8 258.736 178.2 253.536 173.4C248.336 168.6 241.736 166.2 233.736 166.2C226.536 166.2 220.336 168.4 215.136 172.8C210.336 177.2 207.936 182.8 207.936 189.6H141.336C141.336 164.8 150.136 144.6 167.736 129C185.336 113 207.936 105 235.536 105C263.136 105 285.536 112.2 302.736 126.6C320.336 141 329.136 160 329.136 183.6C329.136 200.8 324.536 214.8 315.336 225.6C306.136 236 294.336 243.2 279.936 247.2C297.136 252 310.736 260.2 320.736 271.8C331.136 283.4 336.336 298 336.336 315.6C336.336 340.4 326.936 360.8 308.136 376.8C289.336 392.8 264.936 400.8 234.936 400.8Z" fill="currentColor"/>
-                            <path d="M26.8714 167.6H1.67139V105.2H94.6714V400.2H26.8714V167.6Z" fill="currentColor"/>
-                            <path d="M234.936 400.8C204.136 400.8 178.936 392.4 159.336 375.6C140.136 358.8 130.536 337 130.536 310.2H200.736C200.736 318.2 203.736 324.8 209.736 330C215.736 335.2 223.736 337.8 233.736 337.8C243.336 337.8 251.136 335 257.136 329.4C263.536 323.8 266.736 316.6 266.736 307.8C266.736 299.8 263.936 293.2 258.336 288C252.736 282.8 245.536 280.2 236.736 280.2H199.536V218.4H236.736C243.536 218.4 249.336 216 254.136 211.2C258.936 206.4 261.336 200.4 261.336 193.2C261.336 184.8 258.736 178.2 253.536 173.4C248.336 168.6 241.736 166.2 233.736 166.2C226.536 166.2 220.336 168.4 215.136 172.8C210.336 177.2 207.936 182.8 207.936 189.6H141.336C141.336 164.8 150.136 144.6 167.736 129C185.336 113 207.936 105 235.536 105C263.136 105 285.536 112.2 302.736 126.6C320.336 141 329.136 160 329.136 183.6C329.136 200.8 324.536 214.8 315.336 225.6C306.136 236 294.336 243.2 279.936 247.2C297.136 252 310.736 260.2 320.736 271.8C331.136 283.4 336.336 298 336.336 315.6C336.336 340.4 326.936 360.8 308.136 376.8C289.336 392.8 264.936 400.8 234.936 400.8Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-1-mask)"/>
-                            <path d="M26.8714 167.6H1.67139V105.2H94.6714V400.2H26.8714V167.6Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-1-mask)"/>
-                        </g>
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=Inter:wght@400;500;600;700&family=Tajawal:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-                        <g class="transition-all delay-400 opacity-100 duration-750 starting:opacity-0 motion-safe:starting:-translate-x-[26px] text-[#F3BEC7] dark:text-[#4B0600]">
-                            <mask id="path-2-mask" maskUnits="userSpaceOnUse" x="25.3357" y="103" width="338" height="299" fill="black">
-                                <rect fill="white" x="25.3357" y="103" width="338" height="299"/>
-                                <path d="M260.6 400.8C229.8 400.8 204.6 392.4 185 375.6C165.8 358.8 156.2 337 156.2 310.2H226.4C226.4 318.2 229.4 324.8 235.4 330C241.4 335.2 249.4 337.8 259.4 337.8C269 337.8 276.8 335 282.8 329.4C289.2 323.8 292.4 316.6 292.4 307.8C292.4 299.8 289.6 293.2 284 288C278.4 282.8 271.2 280.2 262.4 280.2H225.2V218.4H262.4C269.2 218.4 275 216 279.8 211.2C284.6 206.4 287 200.4 287 193.2C287 184.8 284.4 178.2 279.2 173.4C274 168.6 267.4 166.2 259.4 166.2C252.2 166.2 246 168.4 240.8 172.8C236 177.2 233.6 182.8 233.6 189.6H167C167 164.8 175.8 144.6 193.4 129C211 113 233.6 105 261.2 105C288.8 105 311.2 112.2 328.4 126.6C346 141 354.8 160 354.8 183.6C354.8 200.8 350.2 214.8 341 225.6C331.8 236 320 243.2 305.6 247.2C322.8 252 336.4 260.2 346.4 271.8C356.8 283.4 362 298 362 315.6C362 340.4 352.6 360.8 333.8 376.8C315 392.8 290.6 400.8 260.6 400.8Z"/>
-                                <path d="M52.5357 167.6H27.3357V105.2H120.336V400.2H52.5357V167.6Z"/>
-                            </mask>
-                            <path d="M260.6 400.8C229.8 400.8 204.6 392.4 185 375.6C165.8 358.8 156.2 337 156.2 310.2H226.4C226.4 318.2 229.4 324.8 235.4 330C241.4 335.2 249.4 337.8 259.4 337.8C269 337.8 276.8 335 282.8 329.4C289.2 323.8 292.4 316.6 292.4 307.8C292.4 299.8 289.6 293.2 284 288C278.4 282.8 271.2 280.2 262.4 280.2H225.2V218.4H262.4C269.2 218.4 275 216 279.8 211.2C284.6 206.4 287 200.4 287 193.2C287 184.8 284.4 178.2 279.2 173.4C274 168.6 267.4 166.2 259.4 166.2C252.2 166.2 246 168.4 240.8 172.8C236 177.2 233.6 182.8 233.6 189.6H167C167 164.8 175.8 144.6 193.4 129C211 113 233.6 105 261.2 105C288.8 105 311.2 112.2 328.4 126.6C346 141 354.8 160 354.8 183.6C354.8 200.8 350.2 214.8 341 225.6C331.8 236 320 243.2 305.6 247.2C322.8 252 336.4 260.2 346.4 271.8C356.8 283.4 362 298 362 315.6C362 340.4 352.6 360.8 333.8 376.8C315 392.8 290.6 400.8 260.6 400.8Z" fill="currentColor"/>
-                            <path d="M52.5357 167.6H27.3357V105.2H120.336V400.2H52.5357V167.6Z" fill="currentColor"/>
-                            <path d="M260.6 400.8C229.8 400.8 204.6 392.4 185 375.6C165.8 358.8 156.2 337 156.2 310.2H226.4C226.4 318.2 229.4 324.8 235.4 330C241.4 335.2 249.4 337.8 259.4 337.8C269 337.8 276.8 335 282.8 329.4C289.2 323.8 292.4 316.6 292.4 307.8C292.4 299.8 289.6 293.2 284 288C278.4 282.8 271.2 280.2 262.4 280.2H225.2V218.4H262.4C269.2 218.4 275 216 279.8 211.2C284.6 206.4 287 200.4 287 193.2C287 184.8 284.4 178.2 279.2 173.4C274 168.6 267.4 166.2 259.4 166.2C252.2 166.2 246 168.4 240.8 172.8C236 177.2 233.6 182.8 233.6 189.6H167C167 164.8 175.8 144.6 193.4 129C211 113 233.6 105 261.2 105C288.8 105 311.2 112.2 328.4 126.6C346 141 354.8 160 354.8 183.6C354.8 200.8 350.2 214.8 341 225.6C331.8 236 320 243.2 305.6 247.2C322.8 252 336.4 260.2 346.4 271.8C356.8 283.4 362 298 362 315.6C362 340.4 352.6 360.8 333.8 376.8C315 392.8 290.6 400.8 260.6 400.8Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-2-mask)"/>
-                            <path d="M52.5357 167.6H27.3357V105.2H120.336V400.2H52.5357V167.6Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-2-mask)"/>
-                        </g>
+    <style>
+        :root {
+            /* Tokens audited for WCAG AA contrast on body text (4.5:1) */
+            --canvas: #FFFFFF;
+            --paper: #FAFBFC;
+            --surface: #F4F6F9;
+            --surface-2: #E9EDF2;
+            --ink: #0B1626;          /* 17.4:1 on canvas — AAA */
+            --ink-soft: #3F4A5A;     /* 8.6:1 on canvas — AAA */
+            --ink-mute: #5C6677;     /* 5.4:1 on canvas — AA body */
+            --hairline: #DCE2EA;
+            --hairline-soft: #E6EAF0;
+            --navy: #0F2942;
+            --navy-deep: #0A1E33;
+            --navy-light: #1B3A6B;
+            --navy-soft: #E1E9F6;
+            --gold: #FAF3E0;
+            --gold-deep: #B8932F;
+            --green: #156B40;
+            --green-soft: #DDF1E5;
 
-                        <g class="mix-blend-color dark:mix-blend-hard-light transition-all delay-400 opacity-100 duration-750 starting:opacity-0 motion-safe:starting:-translate-x-[51px] text-[#F8B803] dark:text-[#391800]">
-                            <mask id="path-3-mask" maskUnits="userSpaceOnUse" x="51" y="103" width="338" height="299" fill="black">
-                                <rect fill="white" x="51" y="103" width="338" height="299"/>
-                                <path d="M286.264 400.8C255.464 400.8 230.264 392.4 210.664 375.6C191.464 358.8 181.864 337 181.864 310.2H252.064C252.064 318.2 255.064 324.8 261.064 330C267.064 335.2 275.064 337.8 285.064 337.8C294.664 337.8 302.464 335 308.464 329.4C314.864 323.8 318.064 316.6 318.064 307.8C318.064 299.8 315.264 293.2 309.664 288C304.064 282.8 296.864 280.2 288.064 280.2H250.864V218.4H288.064C294.864 218.4 300.664 216 305.464 211.2C310.264 206.4 312.664 200.4 312.664 193.2C312.664 184.8 310.064 178.2 304.864 173.4C299.664 168.6 293.064 166.2 285.064 166.2C277.864 166.2 271.664 168.4 266.464 172.8C261.664 177.2 259.264 182.8 259.264 189.6H192.664C192.664 164.8 201.464 144.6 219.064 129C236.664 113 259.264 105 286.864 105C314.464 105 336.864 112.2 354.064 126.6C371.664 141 380.464 160 380.464 183.6C380.464 200.8 375.864 214.8 366.664 225.6C357.464 236 345.664 243.2 331.264 247.2C348.464 252 362.064 260.2 372.064 271.8C382.464 283.4 387.664 298 387.664 315.6C387.664 340.4 378.264 360.8 359.464 376.8C340.664 392.8 316.264 400.8 286.264 400.8Z"/>
-                                <path d="M78.2 167.6H53V105.2H146V400.2H78.2V167.6Z"/>
-                            </mask>
-                            <path d="M286.264 400.8C255.464 400.8 230.264 392.4 210.664 375.6C191.464 358.8 181.864 337 181.864 310.2H252.064C252.064 318.2 255.064 324.8 261.064 330C267.064 335.2 275.064 337.8 285.064 337.8C294.664 337.8 302.464 335 308.464 329.4C314.864 323.8 318.064 316.6 318.064 307.8C318.064 299.8 315.264 293.2 309.664 288C304.064 282.8 296.864 280.2 288.064 280.2H250.864V218.4H288.064C294.864 218.4 300.664 216 305.464 211.2C310.264 206.4 312.664 200.4 312.664 193.2C312.664 184.8 310.064 178.2 304.864 173.4C299.664 168.6 293.064 166.2 285.064 166.2C277.864 166.2 271.664 168.4 266.464 172.8C261.664 177.2 259.264 182.8 259.264 189.6H192.664C192.664 164.8 201.464 144.6 219.064 129C236.664 113 259.264 105 286.864 105C314.464 105 336.864 112.2 354.064 126.6C371.664 141 380.464 160 380.464 183.6C380.464 200.8 375.864 214.8 366.664 225.6C357.464 236 345.664 243.2 331.264 247.2C348.464 252 362.064 260.2 372.064 271.8C382.464 283.4 387.664 298 387.664 315.6C387.664 340.4 378.264 360.8 359.464 376.8C340.664 392.8 316.264 400.8 286.264 400.8Z" fill="currentColor"/>
-                            <path d="M78.2 167.6H53V105.2H146V400.2H78.2V167.6Z" fill="currentColor"/>
-                            <path d="M286.264 400.8C255.464 400.8 230.264 392.4 210.664 375.6C191.464 358.8 181.864 337 181.864 310.2H252.064C252.064 318.2 255.064 324.8 261.064 330C267.064 335.2 275.064 337.8 285.064 337.8C294.664 337.8 302.464 335 308.464 329.4C314.864 323.8 318.064 316.6 318.064 307.8C318.064 299.8 315.264 293.2 309.664 288C304.064 282.8 296.864 280.2 288.064 280.2H250.864V218.4H288.064C294.864 218.4 300.664 216 305.464 211.2C310.264 206.4 312.664 200.4 312.664 193.2C312.664 184.8 310.064 178.2 304.864 173.4C299.664 168.6 293.064 166.2 285.064 166.2C277.864 166.2 271.664 168.4 266.464 172.8C261.664 177.2 259.264 182.8 259.264 189.6H192.664C192.664 164.8 201.464 144.6 219.064 129C236.664 113 259.264 105 286.864 105C314.464 105 336.864 112.2 354.064 126.6C371.664 141 380.464 160 380.464 183.6C380.464 200.8 375.864 214.8 366.664 225.6C357.464 236 345.664 243.2 331.264 247.2C348.464 252 362.064 260.2 372.064 271.8C382.464 283.4 387.664 298 387.664 315.6C387.664 340.4 378.264 360.8 359.464 376.8C340.664 392.8 316.264 400.8 286.264 400.8Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-3-mask)"/>
-                            <path d="M78.2 167.6H53V105.2H146V400.2H78.2V167.6Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-3-mask)"/>
-                        </g>
+            --f-serif:  'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+            --f-sans:   'Inter', system-ui, -apple-system, sans-serif;
+            --f-mono:   'JetBrains Mono', ui-monospace, monospace;
+            --f-arabic: 'Tajawal', 'Inter', system-ui, sans-serif;
+        }
 
-                        <g class="mix-blend-multiply dark:mix-blend-normal transition-all delay-400 opacity-100 duration-750 starting:opacity-0 motion-safe:starting:-translate-x-[78px] text-[#F3BEC7] dark:text-[#733000]">
-                            <mask id="path-4-mask" maskUnits="userSpaceOnUse" x="76.6643" y="103" width="338" height="299" fill="black">
-                                <rect fill="white" x="76.6643" y="103" width="338" height="299"/>
-                                <path d="M311.929 400.8C281.129 400.8 255.929 392.4 236.329 375.6C217.129 358.8 207.529 337 207.529 310.2H277.729C277.729 318.2 280.729 324.8 286.729 330C292.729 335.2 300.729 337.8 310.729 337.8C320.329 337.8 328.129 335 334.129 329.4C340.529 323.8 343.729 316.6 343.729 307.8C343.729 299.8 340.929 293.2 335.329 288C329.729 282.8 322.529 280.2 313.729 280.2H276.529V218.4H313.729C320.529 218.4 326.329 216 331.129 211.2C335.929 206.4 338.329 200.4 338.329 193.2C338.329 184.8 335.729 178.2 330.529 173.4C325.329 168.6 318.729 166.2 310.729 166.2C303.529 166.2 297.329 168.4 292.129 172.8C287.329 177.2 284.929 182.8 284.929 189.6H218.329C218.329 164.8 227.129 144.6 244.729 129C262.329 113 284.929 105 312.529 105C340.129 105 362.529 112.2 379.729 126.6C397.329 141 406.129 160 406.129 183.6C406.129 200.8 401.529 214.8 392.329 225.6C383.129 236 371.329 243.2 356.929 247.2C374.129 252 387.729 260.2 397.729 271.8C408.129 283.4 413.329 298 413.329 315.6C413.329 340.4 403.929 360.8 385.129 376.8C366.329 392.8 341.929 400.8 311.929 400.8Z"/>
-                                <path d="M103.864 167.6H78.6643V105.2H171.664V400.2H103.864V167.6Z"/>
-                            </mask>
-                            <path d="M311.929 400.8C281.129 400.8 255.929 392.4 236.329 375.6C217.129 358.8 207.529 337 207.529 310.2H277.729C277.729 318.2 280.729 324.8 286.729 330C292.729 335.2 300.729 337.8 310.729 337.8C320.329 337.8 328.129 335 334.129 329.4C340.529 323.8 343.729 316.6 343.729 307.8C343.729 299.8 340.929 293.2 335.329 288C329.729 282.8 322.529 280.2 313.729 280.2H276.529V218.4H313.729C320.529 218.4 326.329 216 331.129 211.2C335.929 206.4 338.329 200.4 338.329 193.2C338.329 184.8 335.729 178.2 330.529 173.4C325.329 168.6 318.729 166.2 310.729 166.2C303.529 166.2 297.329 168.4 292.129 172.8C287.329 177.2 284.929 182.8 284.929 189.6H218.329C218.329 164.8 227.129 144.6 244.729 129C262.329 113 284.929 105 312.529 105C340.129 105 362.529 112.2 379.729 126.6C397.329 141 406.129 160 406.129 183.6C406.129 200.8 401.529 214.8 392.329 225.6C383.129 236 371.329 243.2 356.929 247.2C374.129 252 387.729 260.2 397.729 271.8C408.129 283.4 413.329 298 413.329 315.6C413.329 340.4 403.929 360.8 385.129 376.8C366.329 392.8 341.929 400.8 311.929 400.8Z" fill="currentColor"/>
-                            <path d="M103.864 167.6H78.6643V105.2H171.664V400.2H103.864V167.6Z" fill="currentColor"/>
-                            <path d="M311.929 400.8C281.129 400.8 255.929 392.4 236.329 375.6C217.129 358.8 207.529 337 207.529 310.2H277.729C277.729 318.2 280.729 324.8 286.729 330C292.729 335.2 300.729 337.8 310.729 337.8C320.329 337.8 328.129 335 334.129 329.4C340.529 323.8 343.729 316.6 343.729 307.8C343.729 299.8 340.929 293.2 335.329 288C329.729 282.8 322.529 280.2 313.729 280.2H276.529V218.4H313.729C320.529 218.4 326.329 216 331.129 211.2C335.929 206.4 338.329 200.4 338.329 193.2C338.329 184.8 335.729 178.2 330.529 173.4C325.329 168.6 318.729 166.2 310.729 166.2C303.529 166.2 297.329 168.4 292.129 172.8C287.329 177.2 284.929 182.8 284.929 189.6H218.329C218.329 164.8 227.129 144.6 244.729 129C262.329 113 284.929 105 312.529 105C340.129 105 362.529 112.2 379.729 126.6C397.329 141 406.129 160 406.129 183.6C406.129 200.8 401.529 214.8 392.329 225.6C383.129 236 371.329 243.2 356.929 247.2C374.129 252 387.729 260.2 397.729 271.8C408.129 283.4 413.329 298 413.329 315.6C413.329 340.4 403.929 360.8 385.129 376.8C366.329 392.8 341.929 400.8 311.929 400.8Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-4-mask)"/>
-                            <path d="M103.864 167.6H78.6643V105.2H171.664V400.2H103.864V167.6Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-4-mask)"/>
-                        </g>
+        html.dark {
+            --canvas: #0A0F18;
+            --paper: #131B2C;
+            --surface: #131B2C;
+            --surface-2: #1B243A;
+            --ink: #F6F8FB;
+            --ink-soft: #C5CDD9;
+            --ink-mute: #98A3B5;
+            --hairline: #243049;
+            --hairline-soft: #1B2438;
+            --navy: #0F2942;
+            --navy-deep: #050D17;
+            --navy-soft: rgba(140, 170, 230, 0.16);
+            --gold: rgba(201, 168, 74, 0.14);
+            --green: #4FB67E;
+            --green-soft: rgba(79, 182, 126, 0.14);
+        }
 
-                        <g class="mix-blend-hard-light transition-all delay-400 opacity-100 duration-750 starting:opacity-0 motion-safe:starting:-translate-x-[102px] text-[#F3BEC7] dark:text-[#4B0600]">
-                            <mask id="path-5-mask" maskUnits="userSpaceOnUse" x="102.329" y="103" width="338" height="299" fill="black">
-                                <rect fill="white" x="102.329" y="103" width="338" height="299"/>
-                                <path d="M337.593 400.8C306.793 400.8 281.593 392.4 261.993 375.6C242.793 358.8 233.193 337 233.193 310.2H303.393C303.393 318.2 306.393 324.8 312.393 330C318.393 335.2 326.393 337.8 336.393 337.8C345.993 337.8 353.793 335 359.793 329.4C366.193 323.8 369.393 316.6 369.393 307.8C369.393 299.8 366.593 293.2 360.993 288C355.393 282.8 348.193 280.2 339.393 280.2H302.193V218.4H339.393C346.193 218.4 351.993 216 356.793 211.2C361.593 206.4 363.993 200.4 363.993 193.2C363.993 184.8 361.393 178.2 356.193 173.4C350.993 168.6 344.393 166.2 336.393 166.2C329.193 166.2 322.993 168.4 317.793 172.8C312.993 177.2 310.593 182.8 310.593 189.6H243.993C243.993 164.8 252.793 144.6 270.393 129C287.993 113 310.593 105 338.193 105C365.793 105 388.193 112.2 405.393 126.6C422.993 141 431.793 160 431.793 183.6C431.793 200.8 427.193 214.8 417.993 225.6C408.793 236 396.993 243.2 382.593 247.2C399.793 252 413.393 260.2 423.393 271.8C433.793 283.4 438.993 298 438.993 315.6C438.993 340.4 429.593 360.8 410.793 376.8C391.993 392.8 367.593 400.8 337.593 400.8Z"/>
-                                <path d="M129.529 167.6H104.329V105.2H197.329V400.2H129.529V167.6Z"/>
-                            </mask>
-                            <path d="M337.593 400.8C306.793 400.8 281.593 392.4 261.993 375.6C242.793 358.8 233.193 337 233.193 310.2H303.393C303.393 318.2 306.393 324.8 312.393 330C318.393 335.2 326.393 337.8 336.393 337.8C345.993 337.8 353.793 335 359.793 329.4C366.193 323.8 369.393 316.6 369.393 307.8C369.393 299.8 366.593 293.2 360.993 288C355.393 282.8 348.193 280.2 339.393 280.2H302.193V218.4H339.393C346.193 218.4 351.993 216 356.793 211.2C361.593 206.4 363.993 200.4 363.993 193.2C363.993 184.8 361.393 178.2 356.193 173.4C350.993 168.6 344.393 166.2 336.393 166.2C329.193 166.2 322.993 168.4 317.793 172.8C312.993 177.2 310.593 182.8 310.593 189.6H243.993C243.993 164.8 252.793 144.6 270.393 129C287.993 113 310.593 105 338.193 105C365.793 105 388.193 112.2 405.393 126.6C422.993 141 431.793 160 431.793 183.6C431.793 200.8 427.193 214.8 417.993 225.6C408.793 236 396.993 243.2 382.593 247.2C399.793 252 413.393 260.2 423.393 271.8C433.793 283.4 438.993 298 438.993 315.6C438.993 340.4 429.593 360.8 410.793 376.8C391.993 392.8 367.593 400.8 337.593 400.8Z" fill="currentColor"/>
-                            <path d="M129.529 167.6H104.329V105.2H197.329V400.2H129.529V167.6Z" fill="currentColor"/>
-                            <path d="M337.593 400.8C306.793 400.8 281.593 392.4 261.993 375.6C242.793 358.8 233.193 337 233.193 310.2H303.393C303.393 318.2 306.393 324.8 312.393 330C318.393 335.2 326.393 337.8 336.393 337.8C345.993 337.8 353.793 335 359.793 329.4C366.193 323.8 369.393 316.6 369.393 307.8C369.393 299.8 366.593 293.2 360.993 288C355.393 282.8 348.193 280.2 339.393 280.2H302.193V218.4H339.393C346.193 218.4 351.993 216 356.793 211.2C361.593 206.4 363.993 200.4 363.993 193.2C363.993 184.8 361.393 178.2 356.193 173.4C350.993 168.6 344.393 166.2 336.393 166.2C329.193 166.2 322.993 168.4 317.793 172.8C312.993 177.2 310.593 182.8 310.593 189.6H243.993C243.993 164.8 252.793 144.6 270.393 129C287.993 113 310.593 105 338.193 105C365.793 105 388.193 112.2 405.393 126.6C422.993 141 431.793 160 431.793 183.6C431.793 200.8 427.193 214.8 417.993 225.6C408.793 236 396.993 243.2 382.593 247.2C399.793 252 413.393 260.2 423.393 271.8C433.793 283.4 438.993 298 438.993 315.6C438.993 340.4 429.593 360.8 410.793 376.8C391.993 392.8 367.593 400.8 337.593 400.8Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-5-mask)"/>
-                            <path d="M129.529 167.6H104.329V105.2H197.329V400.2H129.529V167.6Z" stroke="var(--stroke-color)" stroke-width="2.4" mask="url(#path-5-mask)"/>
-                        </g>
-                    </svg>
-                    <div class="absolute inset-0 rounded-t-lg lg:rounded-t-none lg:rounded-r-lg shadow-[inset_0px_0px_0px_1px_rgba(26,26,0,0.16)] dark:shadow-[inset_0px_0px_0px_1px_#fffaed2d]"></div>
-                </div>
-            </main>
+        * { box-sizing: border-box; }
+        html { background: var(--canvas); }
+        body {
+            margin: 0;
+            background: var(--canvas);
+            color: var(--ink);
+            font-family: var(--f-sans);
+            font-feature-settings: 'ss01', 'cv11';
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            line-height: 1.5;
+        }
+        :where(html[dir="rtl"]) body { font-family: var(--f-arabic); }
+
+        a { color: inherit; text-decoration: none; }
+        ul { list-style: none; padding: 0; margin: 0; }
+        button { font-family: inherit; }
+
+        .ar { font-family: var(--f-arabic); }
+        .en { font-family: var(--f-sans); }
+        .mono { font-family: var(--f-mono); }
+        .serif { font-family: var(--f-serif); }
+
+        .wrap { max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+        @media (min-width: 768px) { .wrap { padding: 0 2.5rem; } }
+
+        ::selection { background: var(--navy); color: #fff; }
+
+        /* ────────  Eyebrow / Tag chip  ──────── */
+        .eyebrow {
+            font-family: var(--f-mono);
+            font-size: 11px;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--ink-mute);
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+        .badge-tag {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.35rem 0.85rem;
+            background: var(--navy-soft); color: var(--navy);
+            border-radius: 9999px;
+            font-family: var(--f-mono);
+            font-size: 11px; font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+        html.dark .badge-tag { background: rgba(108, 145, 220, 0.16); color: #8FB0E5; }
+        .badge-tag .pip {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--navy);
+        }
+        html.dark .badge-tag .pip { background: #8FB0E5; }
+
+        /* ────────  Display type  ──────── */
+        .display-serif {
+            font-family: var(--f-serif);
+            font-weight: 500;
+            letter-spacing: -0.022em;
+            line-height: 1.05;
+            color: var(--ink);
+        }
+        :where(html[dir="rtl"]) .display-serif {
+            font-family: var(--f-arabic);
+            font-weight: 700;
+            letter-spacing: -0.005em;
+            line-height: 1.2;
+        }
+        .display-sans {
+            font-family: var(--f-sans);
+            font-weight: 600;
+            letter-spacing: -0.025em;
+            line-height: 1.1;
+        }
+        :where(html[dir="rtl"]) .display-sans {
+            font-family: var(--f-arabic);
+            font-weight: 700;
+        }
+
+        .lede {
+            color: var(--ink-soft);
+            font-size: 17px;
+            line-height: 1.65;
+            max-width: 32em;
+            font-weight: 400;
+        }
+        :where(html[dir="rtl"]) .lede { font-size: 17.5px; line-height: 1.85; }
+
+        /* ────────  Buttons  ──────── */
+        .btn-primary {
+            display: inline-flex; align-items: center; gap: 0.6rem;
+            padding: 0.85rem 1.4rem;
+            background: var(--navy); color: #fff;
+            border-radius: 10px;
+            font-size: 14px; font-weight: 600;
+            letter-spacing: -0.005em;
+            transition: background 0.15s, transform 0.15s;
+            border: 1px solid var(--navy);
+            cursor: pointer;
+        }
+        .btn-primary:hover { background: var(--navy-deep); transform: translateY(-1px); }
+
+        .btn-outline {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.8rem 1.3rem;
+            background: var(--canvas); color: var(--ink);
+            border: 1px solid var(--hairline);
+            border-radius: 10px;
+            font-size: 14px; font-weight: 600;
+            transition: border-color 0.15s, background 0.15s;
+            cursor: pointer;
+        }
+        .btn-outline:hover { border-color: var(--ink); background: var(--surface); }
+
+        .btn-link {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            font-size: 14px; font-weight: 500;
+            color: var(--ink-soft);
+            transition: color 0.15s;
+        }
+        .btn-link:hover { color: var(--navy); }
+
+        .nav-link {
+            font-size: 14px; font-weight: 500;
+            color: var(--ink-soft);
+            transition: color 0.15s;
+            padding: 0.4rem 0.65rem;
+        }
+        .nav-link:hover { color: var(--ink); }
+
+        /* ────────  Header  ──────── */
+        .nav-shell {
+            position: sticky; top: 0; z-index: 40;
+            background: color-mix(in oklab, var(--canvas) 88%, transparent);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        .logo-mark {
+            width: 36px; height: 36px;
+            border-radius: 8px;
+            background: var(--navy);
+            color: #fff;
+            display: inline-flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .logo-text {
+            font-family: var(--f-serif);
+            font-size: 22px; font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--ink);
+        }
+        :where(html[dir="rtl"]) .logo-text { font-family: var(--f-arabic); font-weight: 700; }
+
+        /* AR/EN pill toggle */
+        .lang-toggle {
+            display: inline-flex; align-items: center;
+            background: var(--surface);
+            border: 1px solid var(--hairline);
+            border-radius: 9999px;
+            padding: 3px;
+            position: relative;
+        }
+        .lang-toggle button {
+            padding: 0.35rem 0.85rem;
+            font-family: var(--f-mono);
+            font-size: 11px; font-weight: 600;
+            letter-spacing: 0.05em;
+            color: var(--ink-mute);
+            background: transparent;
+            border: 0; border-radius: 9999px;
+            cursor: pointer;
+            transition: color 0.15s, background 0.15s;
+        }
+        .lang-toggle button.active {
+            background: var(--navy); color: #fff;
+        }
+
+        /* ────────  Hero  ──────── */
+        .hero {
+            padding: clamp(3rem, 7vw, 5.5rem) 0 clamp(4rem, 8vw, 6.5rem);
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 3rem;
+            align-items: start;
+            position: relative;
+        }
+        @media (min-width: 1000px) {
+            .hero-grid { grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: 4rem; }
+        }
+        .hero h1 {
+            font-size: clamp(38px, 5.4vw, 64px);
+            margin: 1.25rem 0 1.5rem;
+            max-width: 14ch;
+        }
+        .hero-cta-row {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 0.85rem;
+            margin-top: 2rem;
+        }
+        .hero-foot {
+            margin-top: 1rem;
+            display: inline-flex; align-items: center; gap: 0.45rem;
+            font-size: 12.5px; color: var(--ink-mute);
+        }
+        .hero-foot .check {
+            width: 14px; height: 14px; border-radius: 50%;
+            background: var(--green); color: #fff;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 9px;
+        }
+
+        /* ────────  Product preview (hero right)  ──────── */
+        .preview {
+            background: var(--canvas);
+            border: 1px solid var(--hairline);
+            border-radius: 14px;
+            box-shadow:
+                0 1px 0 rgba(255,255,255,0.6) inset,
+                0 30px 60px -30px rgba(15, 27, 45, 0.18),
+                0 8px 24px -12px rgba(15, 27, 45, 0.10);
+            overflow: hidden;
+            display: grid;
+            grid-template-columns: 44px 1fr;
+            min-height: 460px;
+        }
+        html.dark .preview {
+            box-shadow: 0 30px 60px -30px rgba(0,0,0,0.6);
+        }
+        .preview-side {
+            background: var(--navy);
+            display: flex; flex-direction: column; align-items: center;
+            padding: 0.85rem 0;
+            gap: 0.4rem;
+        }
+        .preview-side .ic {
+            width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+            color: rgba(255,255,255,0.78);
+            border-radius: 6px;
+        }
+        .preview-side .ic.active {
+            background: rgba(255,255,255,0.18);
+            color: #fff;
+        }
+        .preview-main { display: flex; flex-direction: column; }
+        .preview-bar {
+            display: flex; align-items: center; gap: 0.6rem;
+            padding: 0.85rem 1.1rem;
+            border-bottom: 1px solid var(--hairline-soft);
+            font-size: 13px; color: var(--ink-soft);
+            flex-wrap: wrap;
+        }
+        .preview-bar .crumb { color: var(--ink-mute); }
+        .preview-bar .arrow-sep { color: var(--ink-mute); font-size: 11px; }
+        .preview-bar .crumb-cur { color: var(--ink); font-weight: 500; }
+        .verified-chip {
+            margin-inline-start: auto;
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            padding: 0.35rem 0.7rem;
+            background: var(--green-soft); color: var(--green);
+            border-radius: 9999px;
+            font-family: var(--f-mono); font-size: 11px; font-weight: 600;
+        }
+        .verified-chip .v-tick {
+            width: 14px; height: 14px; border-radius: 50%;
+            background: var(--green); color: #fff;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 9px;
+        }
+        .preview-icon-row {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            margin-inline-start: 0.5rem;
+            color: var(--ink-mute);
+        }
+        .preview-icon-row .icon-btn {
+            width: 30px; height: 30px;
+            display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 6px;
+            cursor: pointer; transition: background 0.15s;
+        }
+        .preview-icon-row .icon-btn:hover { background: var(--surface); color: var(--ink); }
+
+        .preview-cols {
+            display: grid; grid-template-columns: 1fr 1fr;
+            flex: 1;
+        }
+        .preview-col {
+            padding: 1.4rem 1.4rem 1rem;
+        }
+        .preview-col + .preview-col {
+            border-inline-start: 1px solid var(--hairline-soft);
+        }
+        .preview-col h5 {
+            font-size: 12.5px; font-weight: 500;
+            color: var(--ink-mute);
+            margin: 0 0 0.85rem;
+        }
+        .preview-col.ar h5 { font-family: var(--f-arabic); font-size: 14px; }
+        .preview-col p {
+            margin: 0;
+            font-size: 14px; line-height: 1.7;
+            color: var(--ink);
+        }
+        .preview-col.ar p {
+            font-family: var(--f-arabic);
+            font-size: 15.5px; line-height: 2;
+            font-weight: 400;
+        }
+        .preview-col h4 {
+            font-size: 15px; font-weight: 600;
+            margin: 0 0 0.7rem;
+            color: var(--ink);
+        }
+        .preview-col.ar h4 { font-family: var(--f-arabic); font-size: 17px; font-weight: 700; }
+
+        .lock {
+            background: #FEF3C7; color: #92400E;
+            padding: 0.05em 0.35em; border-radius: 4px;
+            font-weight: 500;
+        }
+        html.dark .lock { background: rgba(251, 191, 36, 0.15); color: #FCD34D; }
+
+        .article-chip {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            padding: 0.55rem 0.85rem;
+            background: var(--surface);
+            border: 1px solid var(--hairline-soft);
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-size: 12.5px;
+        }
+        .article-chip .a-num { font-weight: 600; color: var(--ink); }
+        .article-chip .a-src { color: var(--ink-mute); font-family: var(--f-mono); font-size: 11px; }
+
+        .glossary-strip {
+            border-top: 1px solid var(--hairline-soft);
+            padding: 1rem 1.4rem;
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: center;
+            gap: 1rem;
+            background: var(--surface);
+        }
+        .glossary-strip .lock-icon {
+            width: 32px; height: 32px;
+            background: var(--canvas);
+            border: 1px solid var(--hairline);
+            border-radius: 8px;
+            display: inline-flex; align-items: center; justify-content: center;
+            color: var(--navy);
+        }
+        .glossary-strip .label-block .lbl {
+            font-size: 13px; font-weight: 600; color: var(--ink); margin: 0;
+        }
+        .glossary-strip .label-block .sub {
+            font-size: 11.5px; color: var(--ink-mute); margin: 0; margin-top: 1px;
+        }
+        .glossary-strip .term-block {
+            display: flex; gap: 1.5rem; align-items: center;
+            font-size: 13px;
+        }
+        .glossary-strip .term-block .ar { font-family: var(--f-arabic); font-size: 15px; }
+        .glossary-strip .locked-chip {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            padding: 0.35rem 0.65rem;
+            background: var(--green-soft); color: var(--green);
+            border-radius: 9999px;
+            font-family: var(--f-mono); font-size: 11px; font-weight: 600;
+        }
+
+        /* ────────  Stats strip  ──────── */
+        .stats {
+            background: var(--surface);
+            border-top: 1px solid var(--hairline);
+            border-bottom: 1px solid var(--hairline);
+            padding: 1.5rem 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr) auto;
+            gap: 2rem;
+            align-items: center;
+        }
+        @media (max-width: 880px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .stats-grid > .stats-meta { grid-column: 1 / -1; text-align: center; }
+        }
+        .stat {
+            display: flex; align-items: center; gap: 0.85rem;
+        }
+        .stat-icon {
+            width: 36px; height: 36px;
+            background: var(--canvas);
+            border: 1px solid var(--hairline);
+            border-radius: 8px;
+            color: var(--navy);
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .stat-num {
+            font-family: var(--f-serif);
+            font-size: 28px; font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--ink);
+            line-height: 1;
+        }
+        :where(html[dir="rtl"]) .stat-num { font-family: var(--f-arabic); }
+        .stat-lbl {
+            font-size: 12.5px; color: var(--ink-soft);
+            margin-top: 4px;
+        }
+        .stats-meta {
+            text-align: end;
+            font-size: 11.5px; color: var(--ink-mute);
+            line-height: 1.5;
+            font-family: var(--f-mono);
+        }
+
+        /* ────────  Capabilities  ──────── */
+        .caps {
+            padding: clamp(3.5rem, 6vw, 5.5rem) 0 clamp(3rem, 5vw, 5rem);
+        }
+        .caps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 2.25rem;
+        }
+        .cap .cap-head {
+            display: flex; align-items: center; gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .cap .cap-num {
+            width: 30px; height: 30px;
+            background: var(--navy); color: #fff;
+            border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-family: var(--f-mono);
+            font-size: 12px; font-weight: 700;
+        }
+        .cap .cap-icon {
+            width: 36px; height: 36px;
+            background: var(--surface);
+            border: 1px solid var(--hairline);
+            border-radius: 8px;
+            display: inline-flex; align-items: center; justify-content: center;
+            color: var(--navy);
+        }
+        .cap h3 {
+            font-size: 17px; font-weight: 600;
+            margin: 0 0 0.5rem;
+            letter-spacing: -0.01em;
+        }
+        .cap p {
+            margin: 0;
+            font-size: 14px; line-height: 1.65;
+            color: var(--ink-soft);
+            max-width: 28em;
+        }
+
+        /* ────────  Bilingual showcase  ──────── */
+        .biling {
+            margin: clamp(3rem, 5vw, 4rem) 0;
+        }
+        .biling-card {
+            display: grid;
+            grid-template-columns: 1fr;
+            border-radius: 16px;
+            overflow: hidden;
+            background: var(--canvas);
+            border: 1px solid var(--hairline);
+        }
+        @media (min-width: 880px) {
+            .biling-card { grid-template-columns: 0.9fr 1.4fr; }
+        }
+        .biling-left {
+            background: var(--navy);
+            color: #fff;
+            padding: 2.5rem 2.25rem;
+        }
+        .biling-left h3 {
+            font-family: var(--f-serif);
+            font-weight: 500;
+            font-size: clamp(28px, 3.5vw, 38px);
+            line-height: 1.12;
+            letter-spacing: -0.02em;
+            margin: 0.85rem 0 1.25rem;
+        }
+        :where(html[dir="rtl"]) .biling-left h3 { font-family: var(--f-arabic); font-weight: 700; }
+        .biling-left p {
+            color: rgba(255,255,255,0.88);
+            font-size: 14.5px;
+            line-height: 1.65;
+            max-width: 26em;
+            margin: 0 0 1.5rem;
+        }
+        .biling-left .eyebrow { color: rgba(255,255,255,0.82); }
+        .biling-left .btn-link { color: rgba(255,255,255,0.92); }
+        .biling-left .btn-link:hover { color: #fff; }
+
+        .biling-right {
+            padding: 2.5rem 2.25rem;
+            display: flex; flex-direction: column; gap: 1.5rem;
+        }
+        .biling-right h4 {
+            font-size: 12.5px; font-weight: 500;
+            color: var(--ink-mute);
+            margin: 0 0 0.85rem;
+        }
+        .biling-right .clause-ar {
+            font-family: var(--f-arabic);
+            font-size: 16.5px;
+            line-height: 2;
+            margin: 0;
+            color: var(--ink);
+        }
+        .biling-right .clause-en p {
+            font-size: 14.5px;
+            line-height: 1.7;
+            margin: 0;
+            color: var(--ink-soft);
+        }
+        .biling-right .clause-en p strong {
+            color: var(--ink);
+        }
+        .lock-row {
+            display: grid;
+            grid-template-columns: auto 1fr 1fr 1.5fr auto;
+            align-items: center;
+            gap: 1rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid var(--hairline-soft);
+            font-size: 12.5px;
+        }
+        @media (max-width: 700px) {
+            .lock-row { grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; }
+            .lock-row > *:last-child { grid-column: 1 / -1; }
+        }
+        .lock-row .l-tag { color: var(--ink-mute); font-family: var(--f-mono); font-size: 11px; }
+        .lock-row .l-ar { font-family: var(--f-arabic); font-size: 15px; color: var(--ink); }
+        .lock-row .l-en { color: var(--ink); font-weight: 500; }
+        .lock-row .l-src { color: var(--ink-mute); font-family: var(--f-mono); font-size: 11px; }
+        .lock-row .l-status {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            padding: 0.35rem 0.7rem;
+            background: var(--green-soft); color: var(--green);
+            border-radius: 9999px;
+            font-family: var(--f-mono); font-size: 11px; font-weight: 600;
+        }
+
+        /* ────────  Coverage / Jurisdictions  ──────── */
+        .coverage {
+            padding: clamp(3.5rem, 6vw, 5.5rem) 0 clamp(3rem, 5vw, 4.5rem);
+        }
+        .coverage-grid {
+            display: grid;
+            grid-template-columns: minmax(180px, 0.8fr) 1fr;
+            gap: 3rem;
+            align-items: start;
+        }
+        @media (max-width: 880px) {
+            .coverage-grid { grid-template-columns: 1fr; gap: 2rem; }
+        }
+        .coverage h2 {
+            font-family: var(--f-serif);
+            font-size: clamp(28px, 3.6vw, 40px);
+            font-weight: 500;
+            letter-spacing: -0.02em;
+            line-height: 1.12;
+            margin: 0.75rem 0 0;
+        }
+        :where(html[dir="rtl"]) .coverage h2 { font-family: var(--f-arabic); font-weight: 700; }
+        .jur-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.85rem;
+        }
+        .jur-card {
+            display: block;
+            padding: 1.1rem 1.25rem;
+            background: var(--canvas);
+            border: 1px solid var(--hairline);
+            border-radius: 12px;
+            transition: border-color 0.18s, transform 0.18s, box-shadow 0.18s;
+        }
+        .jur-card:hover {
+            border-color: var(--navy);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 22px -10px rgba(15, 27, 45, 0.18);
+        }
+        .jur-card .jur-head {
+            display: flex; align-items: center; gap: 0.6rem;
+            margin-bottom: 0.85rem;
+        }
+        .jur-card .flag { font-size: 18px; line-height: 1; }
+        .jur-card .nm { font-weight: 600; font-size: 14.5px; color: var(--ink); }
+        .jur-card .nm.ar { font-family: var(--f-arabic); font-size: 15.5px; font-weight: 700; }
+        .jur-card .iso { margin-inline-start: auto; font-family: var(--f-mono); font-size: 10.5px; color: var(--ink-mute); letter-spacing: 0.05em; }
+        .jur-card .ref-line { font-size: 12.5px; color: var(--ink-soft); margin: 0; line-height: 1.4; }
+        .jur-card .ref-cite { font-family: var(--f-mono); font-size: 11px; color: var(--ink-mute); margin-top: 4px; }
+        .jur-card.ref-cite-ar { font-family: var(--f-arabic); }
+
+        /* ────────  How it works  ──────── */
+        .how {
+            padding: clamp(3.5rem, 6vw, 5.5rem) 0 clamp(3rem, 5vw, 5rem);
+            background: var(--surface);
+            border-top: 1px solid var(--hairline);
+            border-bottom: 1px solid var(--hairline);
+        }
+        .how-grid {
+            display: grid;
+            grid-template-columns: minmax(220px, 0.8fr) 1fr;
+            gap: 3rem;
+            align-items: start;
+        }
+        @media (max-width: 880px) {
+            .how-grid { grid-template-columns: 1fr; gap: 2rem; }
+        }
+        .how h2 {
+            font-family: var(--f-serif);
+            font-size: clamp(26px, 3.4vw, 36px);
+            font-weight: 500;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+            margin: 0.75rem 0 0;
+        }
+        :where(html[dir="rtl"]) .how h2 { font-family: var(--f-arabic); font-weight: 700; }
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0;
+            position: relative;
+        }
+        @media (max-width: 880px) {
+            .steps { grid-template-columns: repeat(2, 1fr); gap: 2rem 1rem; }
+        }
+        @media (max-width: 540px) {
+            .steps { grid-template-columns: 1fr; gap: 1.75rem; }
+        }
+        .step {
+            position: relative;
+            padding-inline-end: 1.25rem;
+        }
+        .step .step-icon {
+            width: 52px; height: 52px;
+            background: var(--canvas);
+            border: 1px solid var(--hairline);
+            border-radius: 50%;
+            display: inline-flex; align-items: center; justify-content: center;
+            color: var(--navy);
+            position: relative;
+            z-index: 2;
+        }
+        .step .connector {
+            position: absolute;
+            top: 26px;
+            inset-inline-start: 56px;
+            inset-inline-end: 0;
+            border-top: 2px dotted var(--hairline);
+            z-index: 1;
+        }
+        .step:last-child .connector { display: none; }
+        .step h4 {
+            font-size: 15.5px; font-weight: 600;
+            margin: 1rem 0 0.4rem;
+            letter-spacing: -0.01em;
+            display: flex; align-items: baseline; gap: 0.4rem;
+        }
+        .step h4 .step-num {
+            font-family: var(--f-mono);
+            font-weight: 600;
+            color: var(--navy);
+        }
+        .step p {
+            font-size: 13px; line-height: 1.6;
+            color: var(--ink-soft);
+            margin: 0;
+            max-width: 22em;
+        }
+        @media (max-width: 880px) {
+            .step .connector { display: none; }
+        }
+
+        /* ────────  Pull quote  ──────── */
+        .quote-section {
+            padding: clamp(3rem, 5vw, 4.5rem) 0;
+        }
+        .quote-card {
+            background: var(--gold);
+            border: 1px solid #EFE2BC;
+            border-radius: 16px;
+            padding: 2.25rem 2.5rem;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 1.75rem;
+            align-items: start;
+        }
+        html.dark .quote-card {
+            border-color: rgba(201, 168, 74, 0.20);
+        }
+        .quote-card .qmark {
+            font-family: var(--f-serif);
+            font-size: 86px;
+            line-height: 0.7;
+            color: var(--gold-deep);
+            font-weight: 600;
+            margin-top: -0.1em;
+        }
+        .quote-card h3 {
+            font-family: var(--f-serif);
+            font-size: 21px; font-weight: 600;
+            letter-spacing: -0.015em;
+            margin: 0 0 0.85rem;
+            color: var(--ink);
+        }
+        :where(html[dir="rtl"]) .quote-card h3 { font-family: var(--f-arabic); font-weight: 700; }
+        .quote-card p {
+            margin: 0;
+            font-size: 16px;
+            line-height: 1.7;
+            color: var(--ink);
+            max-width: 56em;
+        }
+        :where(html[dir="rtl"]) .quote-card p { font-size: 17px; line-height: 1.85; }
+
+        @media (max-width: 600px) {
+            .quote-card { grid-template-columns: 1fr; gap: 0.5rem; padding: 2rem 1.5rem; }
+            .quote-card .qmark { font-size: 64px; }
+        }
+
+        /* ────────  Final CTA  ──────── */
+        .final-cta {
+            padding: clamp(3rem, 5vw, 4rem) 0 clamp(3.5rem, 6vw, 5rem);
+            border-top: 1px solid var(--hairline);
+        }
+        .final-cta-card {
+            display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+            gap: 2rem;
+        }
+        .final-cta-card .copy h3 {
+            font-family: var(--f-serif);
+            font-size: clamp(24px, 3vw, 32px);
+            font-weight: 500;
+            letter-spacing: -0.018em;
+            margin: 0 0 0.5rem;
+            color: var(--ink);
+        }
+        :where(html[dir="rtl"]) .final-cta-card .copy h3 { font-family: var(--f-arabic); font-weight: 700; }
+        .final-cta-card .copy p {
+            margin: 0;
+            font-size: 14.5px;
+            color: var(--ink-soft);
+            max-width: 36em;
+        }
+
+        /* ────────  Footer  ──────── */
+        .footer {
+            background: var(--navy);
+            color: rgba(255,255,255,0.86);
+            padding: clamp(3rem, 5vw, 4.5rem) 0 1.75rem;
+        }
+        .footer .logo-text { color: #fff; }
+        .footer .logo-mark {
+            background: rgba(255,255,255,0.10);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 1.4fr 1fr 1fr 1fr;
+            gap: 3rem;
+        }
+        @media (max-width: 880px) {
+            .footer-grid { grid-template-columns: 1fr 1fr; gap: 2rem; }
+        }
+        @media (max-width: 540px) {
+            .footer-grid { grid-template-columns: 1fr; }
+        }
+        .footer h5 {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #fff;
+            margin: 0 0 1rem;
+            letter-spacing: -0.005em;
+        }
+        .footer ul li { margin-bottom: 0.55rem; }
+        .footer ul a {
+            font-size: 13.5px;
+            color: rgba(255,255,255,0.78);
+            transition: color 0.15s;
+        }
+        .footer ul a:hover { color: #fff; }
+        .footer .blurb {
+            font-size: 13.5px;
+            color: rgba(255,255,255,0.78);
+            line-height: 1.6;
+            margin-top: 1rem;
+            max-width: 22em;
+        }
+        .footer .socials {
+            display: flex; gap: 0.5rem;
+            margin-top: 1.25rem;
+        }
+        .footer .socials a {
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.10);
+            color: rgba(255,255,255,0.85);
+            display: inline-flex; align-items: center; justify-content: center;
+            transition: background 0.15s, color 0.15s;
+        }
+        .footer .socials a:hover { background: rgba(255,255,255,0.18); color: #fff; }
+        .footer-bottom {
+            border-top: 1px solid rgba(255,255,255,0.12);
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            font-size: 11.5px;
+            color: rgba(255,255,255,0.72);
+            display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+            font-family: var(--f-mono);
+        }
+
+        /* ────────  Animation  ──────── */
+        .rise { opacity: 0; transform: translateY(8px); animation: rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+        .r-1 { animation-delay: 0.04s; }
+        .r-2 { animation-delay: 0.12s; }
+        .r-3 { animation-delay: 0.20s; }
+        .r-4 { animation-delay: 0.30s; }
+        @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+        @media (prefers-reduced-motion: reduce) {
+            .rise { opacity: 1; transform: none; animation: none; }
+        }
+    </style>
+</head>
+<body>
+
+{{-- ────────────────────  Header  ──────────────────── --}}
+<header class="nav-shell">
+    <div class="wrap" style="display: flex; align-items: center; justify-content: space-between; height: 72px; gap: 1rem;">
+        <a href="{{ route('home') }}" style="display: inline-flex; align-items: center; gap: 0.65rem;" aria-label="My-lawyer home">
+            <span class="logo-mark" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 21h18"/>
+                    <path d="M5 21V10l7-4 7 4v11"/>
+                    <path d="M9 21v-7h6v7"/>
+                    <circle cx="12" cy="10.5" r="1" fill="currentColor"/>
+                </svg>
+            </span>
+            <span class="logo-text">My-lawyer</span>
+        </a>
+
+        <nav style="display: flex; align-items: center; gap: 0.5rem;">
+            <a href="{{ route('marketing.glossary') }}" class="nav-link" style="display: none;" data-show-md>{{ __('Glossary') }}</a>
+            <a href="{{ route('marketing.faq') }}" class="nav-link" style="display: none;" data-show-md>{{ __('FAQ') }}</a>
+            <a href="{{ route('home') }}#preview" class="nav-link" style="display: none;" data-show-md>{{ __('Sample output') }}</a>
+        </nav>
+
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <form method="POST" action="{{ route('locale.set') }}" class="lang-toggle" id="lang-form">
+                @csrf
+                <button type="button" class="{{ ! $isAr ? 'active' : '' }}" data-lang="en">EN</button>
+                <button type="button" class="{{ $isAr ? 'active' : '' }}" data-lang="ar">AR</button>
+                <input type="hidden" name="locale" id="lang-input" value="{{ $isAr ? 'en' : 'ar' }}">
+            </form>
+
+            @auth
+                <a href="{{ route('dashboard') }}" class="btn-primary">{{ __('Dashboard') }}</a>
+            @endauth
+            @guest
+                <a href="{{ route('login') }}" class="btn-outline" style="padding: 0.6rem 1rem;">{{ __('Sign in') }}</a>
+                <a href="{{ route('register') }}" class="btn-primary" style="padding: 0.65rem 1.1rem;">{{ __('Start free') }}</a>
+            @endguest
+        </div>
+    </div>
+
+    <style>
+        @media (min-width: 880px) {
+            [data-show-md] { display: inline-block !important; }
+        }
+    </style>
+</header>
+
+<script>
+(function() {
+    const form = document.getElementById('lang-form');
+    if (!form) return;
+    const input = document.getElementById('lang-input');
+    form.querySelectorAll('button[data-lang]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            input.value = btn.dataset.lang;
+            form.submit();
+        });
+    });
+})();
+</script>
+
+{{-- ────────────────────  Hero  ──────────────────── --}}
+<section class="hero">
+    <div class="wrap hero-grid">
+        <div>
+            <span class="badge-tag rise r-1" aria-hidden="false">
+                <span class="pip"></span>{{ __('AI legal drafting · built in Cairo') }}
+            </span>
+            <h1 class="display-serif rise r-2">
+                @if ($isAr)
+                    صياغة عقود <span style="color: var(--navy);">القانون المصري</span>، بدقة المحامي وسرعة الذكاء الاصطناعي.
+                @else
+                    Draft contracts under <span style="color: var(--navy);">Egyptian law</span>, with the rigor of a senior associate.
+                @endif
+            </h1>
+            <p class="lede rise r-3">
+                @if ($isAr)
+                    صياغة قانونية تبدأ بالعربية، مرتبطة بالنصوص الفعلية للقانون المدني المصري وقوانين الشركات والعمل والأسواق. كل بند موثَّق، كل مصطلح مقفل. تصدير ثنائي اللغة جنباً إلى جنب. توسعنا الإقليمي قيد التطوير.
+                @else
+                    Arabic-first legal drafting grounded in the actual text of the Egyptian Civil Code and adjacent statutes. Every clause cited, every term locked, exported bilingually. Regional expansion in active development.
+                @endif
+            </p>
+            <div class="hero-cta-row rise r-3">
+                @guest
+                    <a href="{{ route('register') }}" class="btn-primary">
+                        {{ __('Start drafting for free') }}
+                    </a>
+                @endguest
+                @auth
+                    <a href="{{ route('dashboard') }}" class="btn-primary">
+                        {{ __('Open dashboard') }}
+                    </a>
+                @endauth
+                <a href="#preview" class="btn-outline">
+                    {{ __('View sample output') }}
+                </a>
+            </div>
+            <div class="hero-foot rise r-3">
+                <span class="check">✓</span>
+                {{ __('No credit card required. Start in seconds.') }}
+            </div>
         </div>
 
-        @if (Route::has('login'))
-            <div class="h-14.5 hidden lg:block"></div>
-        @endif
-    </body>
+        {{-- Product preview --}}
+        <div id="preview" class="preview rise r-4">
+            <aside class="preview-side">
+                {{-- Document --}}
+                <span class="ic active" title="Drafts" aria-label="Drafts">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/></svg>
+                </span>
+                {{-- Search --}}
+                <span class="ic" aria-label="Search">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+                </span>
+                {{-- Library --}}
+                <span class="ic" aria-label="Library">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h20"/><path d="M5 7v13"/><path d="M19 7v13"/><path d="M9 11h6"/><path d="M9 15h6"/></svg>
+                </span>
+                {{-- History --}}
+                <span class="ic" aria-label="History">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                </span>
+                {{-- Settings --}}
+                <span class="ic" aria-label="Settings">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </span>
+            </aside>
+
+            <div class="preview-main">
+                <div class="preview-bar">
+                    <span class="crumb">Drafts</span>
+                    <span class="arrow-sep">{{ $isAr ? '←' : '›' }}</span>
+                    <span class="crumb-cur">MoU – UAE</span>
+                    <span class="arrow-sep">{{ $isAr ? '←' : '›' }}</span>
+                    <span class="crumb">v2</span>
+
+                    <span class="verified-chip">
+                        <span class="v-tick">✓</span>
+                        8 / 8 {{ __('verified') }}
+                    </span>
+
+                    <span class="preview-icon-row">
+                        <span class="icon-btn" aria-label="Share">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                        </span>
+                        <span class="icon-btn" aria-label="Download">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        </span>
+                        <span class="icon-btn" aria-label="More">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>
+                        </span>
+                    </span>
+                </div>
+
+                <div class="preview-cols" style="flex: 1;">
+                    <div class="preview-col ar" dir="rtl">
+                        <h5>العربية</h5>
+                        <h4>٨. حسن النية</h4>
+                        <p>
+                            يتعهد الطرفان بتنفيذ هذا الاتفاق بـ<span class="lock">حسن نية</span> والامتناع عن أي تصرف من شأنه الإضرار بمقصد هذا الاتفاق أو تحقيق نتيجة مخالفة له.
+                        </p>
+                        <span class="article-chip">
+                            <span class="a-num">المادة ٢٤٦</span>
+                            <span class="a-src">UAE Civil Code</span>
+                        </span>
+                    </div>
+                    <div class="preview-col en" dir="ltr">
+                        <h5>English</h5>
+                        <h4>8. Good Faith</h4>
+                        <p>
+                            The Parties shall perform this Agreement in good faith and refrain from any act that may undermine its purpose or defeat its provisions.
+                        </p>
+                        <span class="article-chip">
+                            <span class="a-num">Article 246</span>
+                            <span class="a-src">UAE Civil Code</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="glossary-strip">
+                    <span class="lock-icon">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </span>
+                    <div class="label-block">
+                        <p class="lbl">{{ __('Glossary lock') }}</p>
+                        <p class="sub">{{ __('Term locked across the document') }}</p>
+                    </div>
+                    <div class="term-block">
+                        <span class="ar">حسن نية</span>
+                        <span style="color: var(--ink-mute);">{{ $isAr ? '←' : '→' }}</span>
+                        <span>good faith</span>
+                    </div>
+                    <span class="locked-chip">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        Locked
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{{-- ────────────────────  Stats strip  ──────────────────── --}}
+<section class="stats">
+    <div class="wrap stats-grid">
+        <div class="stat">
+            <span class="stat-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/></svg>
+            </span>
+            <div>
+                <div class="stat-num">{{ number_format($displayDocs) }}<span style="color: var(--ink-mute);">+</span></div>
+                <div class="stat-lbl">{{ __('Documents indexed') }}</div>
+            </div>
+        </div>
+        <div class="stat">
+            <span class="stat-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/></svg>
+            </span>
+            <div>
+                <div class="stat-num">{{ $displayJurs }}</div>
+                <div class="stat-lbl">{{ __('MENA jurisdictions') }}</div>
+            </div>
+        </div>
+        <div class="stat">
+            <span class="stat-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>
+            <div>
+                <div class="stat-num">700<span style="color: var(--ink-mute);">+</span></div>
+                <div class="stat-lbl">{{ __('Legal terms locked') }}</div>
+            </div>
+        </div>
+        <div class="stats-meta">
+            <div>{{ __('Live counts from our database') }}</div>
+            <div>{{ __('Last updated') }}: {{ $lastUpdated }}</div>
+        </div>
+    </div>
+</section>
+
+{{-- ────────────────────  Capabilities  ──────────────────── --}}
+<section class="caps">
+    <div class="wrap">
+        <div class="caps-grid">
+            <div class="cap">
+                <div class="cap-head">
+                    <span class="cap-num">1</span>
+                    <span class="cap-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </span>
+                </div>
+                <h3>{{ __('Citation-grounded') }}</h3>
+                <p>{{ __('Every clause is checked against the real text of statutes and regulations. Unverifiable citations are flagged, not shipped.') }}</p>
+            </div>
+            <div class="cap">
+                <div class="cap-head">
+                    <span class="cap-num">2</span>
+                    <span class="cap-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+                    </span>
+                </div>
+                <h3>{{ __('Bilingual by default') }}</h3>
+                <p>{{ __('Draft in Arabic and English side-by-side with a glossary lock that keeps legal meaning consistent, document-wide.') }}</p>
+            </div>
+            <div class="cap">
+                <div class="cap-head">
+                    <span class="cap-num">3</span>
+                    <span class="cap-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22h18"/><path d="M5 22V11l7-4 7 4v11"/><path d="M9 22V14h6v8"/></svg>
+                    </span>
+                </div>
+                <h3>{{ __('Region-built') }}</h3>
+                <p>{{ __('Built for 11 jurisdictions with their own laws, citation formats, and institutional vocabulary — not generic templates.') }}</p>
+            </div>
+            <div class="cap">
+                <div class="cap-head">
+                    <span class="cap-num">4</span>
+                    <span class="cap-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+                    </span>
+                </div>
+                <h3>{{ __('Versioned & auditable') }}</h3>
+                <p>{{ __('Every revision is captured. Compare changes, review history, and export with confidence.') }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{{-- ────────────────────  Bilingual showcase  ──────────────────── --}}
+<section class="biling">
+    <div class="wrap">
+        <div class="biling-card">
+            <div class="biling-left">
+                <span class="eyebrow">{{ __('Bilingual showcase') }}</span>
+                <h3>
+                    @if ($isAr)
+                        المصطلحات مقفلة. المعنى محفوظ.
+                    @else
+                        Terminology locked.<br>Meaning preserved.
+                    @endif
+                </h3>
+                <p>
+                    {{ __('Our glossary lock ensures civil-law concepts render identically every time, across the entire document.') }}
+                </p>
+                <a href="{{ route('marketing.glossary') }}" class="btn-link">
+                    {{ __('Explore the glossary') }}
+                    <span aria-hidden="true">{{ $isAr ? '←' : '→' }}</span>
+                </a>
+            </div>
+            <div class="biling-right">
+                <div class="clause-ar-block">
+                    <h4>{{ __('UAE MoU – Clause (Arabic)') }}</h4>
+                    <p class="clause-ar" dir="rtl">
+                        يتعهد الطرفان بالحفاظ على <span class="lock">سرية</span> المعلومات المتبادلة وعدم إفشائها لأي طرف ثالث إلا بموجب متطلب قانوني أو بموافقة خطية مسبقة من الطرف الآخر.
+                    </p>
+                </div>
+                <div class="clause-en">
+                    <h4>{{ __('What the glossary lock does (English)') }}</h4>
+                    <p>
+                        <strong>"سرية"</strong> is always rendered as "confidentiality". Not "secrecy", not "privacy". The legal concept is locked to its civil-law meaning under UAE law (Federal Decree-Law No. 5 of 1985, Civil Transactions Law, Art. 892).
+                    </p>
+                </div>
+                <div class="lock-row">
+                    <span class="l-tag">{{ __('Locked term') }}</span>
+                    <span class="l-ar">سرية</span>
+                    <span class="l-en">confidentiality</span>
+                    <span class="l-src">UAE Civil Code – Art. 892</span>
+                    <span class="l-status">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        Locked
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{{-- ────────────────────  Coverage  ──────────────────── --}}
+<section class="coverage">
+    <div class="wrap">
+        <div class="coverage-grid">
+            <div>
+                <span class="eyebrow">{{ __('Coverage') }}</span>
+                <h2>
+                    @if ($isAr)
+                        ١١ ولاية قضائية. أنظمة قانون مدني.
+                    @else
+                        11 jurisdictions.<br>Civil-law systems.
+                    @endif
+                </h2>
+                <a href="{{ route('marketing.glossary') }}" class="btn-link" style="margin-top: 1.25rem;">
+                    {{ __('View all jurisdictions') }}
+                    <span aria-hidden="true">{{ $isAr ? '←' : '→' }}</span>
+                </a>
+            </div>
+            <div class="jur-cards">
+                @foreach ($jurisdictions as $j)
+                    <a href="{{ route('marketing.jurisdiction', ['iso' => $j['iso']]) }}" class="jur-card">
+                        <div class="jur-head">
+                            <span class="flag" aria-hidden="true">{{ $j['flag'] }}</span>
+                            <span class="nm {{ $isAr ? 'ar' : '' }}">{{ $isAr ? $j['ar'] : $j['en'] }}</span>
+                            <span class="iso">{{ $j['iso'] }}</span>
+                        </div>
+                        <p class="ref-line {{ $isAr ? 'ar' : '' }}" style="{{ $isAr ? 'font-family: var(--f-arabic);' : '' }}">{{ $isAr ? $j['note_ar'] : $j['note_en'] }}</p>
+                        <p class="ref-cite {{ $isAr ? 'ar' : '' }}" style="{{ $isAr ? 'font-family: var(--f-arabic);' : '' }}">{{ $isAr ? $j['cite_ar'] : $j['cite_en'] }}</p>
+                        <div style="margin-top: 0.85rem;">
+                            <x-coverage-badge :iso="$j['iso']" />
+                        </div>
+                    </a>
+                @endforeach
+            </div>
+        </div>
+    </div>
+</section>
+
+{{-- ────────────────────  How it works  ──────────────────── --}}
+<section class="how">
+    <div class="wrap">
+        <div class="how-grid">
+            <div>
+                <span class="eyebrow">{{ __('How it works') }}</span>
+                <h2>
+                    @if ($isAr)
+                        من ملخّص إلى عقد ثنائي اللغة في أربع خطوات.
+                    @else
+                        From brief to<br>bilingual contract<br>in four steps.
+                    @endif
+                </h2>
+            </div>
+            <div class="steps">
+                <?php
+                    $steps = [
+                        [
+                            'icon' => '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><path d="M9 14h6"/><path d="M9 18h4"/></svg>',
+                            'title_en' => 'Brief',
+                            'title_ar' => 'ملخّص',
+                            'body_en' => 'Upload your brief or answer a few questions about the deal and jurisdiction.',
+                            'body_ar' => 'حمّل الملخّص أو أجب عن أسئلة موجزة حول الصفقة والولاية القضائية.',
+                        ],
+                        [
+                            'icon' => '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+                            'title_en' => 'Draft in Arabic',
+                            'title_ar' => 'الصياغة بالعربية',
+                            'body_en' => 'We draft the contract in Arabic using jurisdiction-specific language and structure.',
+                            'body_ar' => 'نصوغ العقد بالعربية بلغة وبنية مناسبة لكل ولاية قضائية.',
+                        ],
+                        [
+                            'icon' => '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>',
+                            'title_en' => 'Citations verified',
+                            'title_ar' => 'توثيق الاستشهادات',
+                            'body_en' => 'Every clause is matched to the controlling statute. 100% verifiable or it gets flagged.',
+                            'body_ar' => 'تتم مطابقة كل بند بالنص الفعلي للقانون الحاكم. التوثيق ١٠٠٪ أو علامة تحذير.',
+                        ],
+                        [
+                            'icon' => '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+                            'title_en' => 'Bilingual export',
+                            'title_ar' => 'تصدير ثنائي اللغة',
+                            'body_en' => 'Export Arabic and English side-by-side with citations, ready to use.',
+                            'body_ar' => 'تصدير العربية والإنجليزية جنباً إلى جنب مع الاستشهادات، جاهز للاستخدام.',
+                        ],
+                    ];
+                ?>
+                @foreach ($steps as $i => $step)
+                    <div class="step">
+                        <span class="step-icon">{!! $step['icon'] !!}</span>
+                        <span class="connector"></span>
+                        <h4><span class="step-num">{{ $i + 1 }}.</span> {{ $isAr ? $step['title_ar'] : $step['title_en'] }}</h4>
+                        <p>{{ $isAr ? $step['body_ar'] : $step['body_en'] }}</p>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+</section>
+
+{{-- ────────────────────  Pull quote  ──────────────────── --}}
+<section class="quote-section">
+    <div class="wrap">
+        <div class="quote-card">
+            <span class="qmark" aria-hidden="true">"</span>
+            <div>
+                <h3>{{ __('Why we built My-lawyer') }}</h3>
+                <p>
+                    @if ($isAr)
+                        هناك أدوات قانونية كثيرة تترجم اللغة. بنينا My-lawyer ليترجم المعنى القانوني — بأمانة، باتساق، وباحترام كامل لأنظمة القانون المدني في منطقتنا.
+                    @else
+                        Too many legal tools translate language. We built My-lawyer to translate legal meaning — faithfully, consistently, and with full respect for the civil-law systems of our region.
+                    @endif
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{{-- ────────────────────  How we work — honest trust  ──────────────────── --}}
+<section style="background: var(--surface); border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); padding: clamp(3.5rem, 6vw, 5rem) 0;">
+    <div class="wrap">
+        <div class="head-block" style="margin-bottom: 2.5rem; max-width: 38rem;">
+            <span class="eyebrow">
+                <span style="display:inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--navy);"></span>
+                {{ __('How we work') }}
+            </span>
+            <h2 style="font-family: var(--f-serif); font-size: clamp(28px, 3.6vw, 40px); font-weight: 500; letter-spacing: -0.02em; line-height: 1.12; margin: 0.75rem 0 0;">
+                @if ($isAr)
+                    صدقاً عن ما نفعله، وما لا نفعله.
+                @else
+                    Honestly, what we do — and what we don't.
+                @endif
+            </h2>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
+
+            {{-- What we do --}}
+            <div class="card-base" style="padding: 1.5rem 1.6rem; background: var(--canvas);">
+                <h3 style="font-family: var(--f-serif); font-size: 18px; font-weight: 600; color: var(--ink); margin: 0 0 1rem; letter-spacing: -0.01em;">
+                    {{ __('What we do') }}
+                </h3>
+                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem;">
+                    <li style="display: flex; gap: 0.65rem; font-size: 14px; line-height: 1.6; color: var(--ink-soft);">
+                        <span style="color: var(--green); flex-shrink: 0;">✓</span>
+                        <span>{{ __('Index the actual text of Egyptian Civil Code, Companies Law 159/1981, Labour Law 12/2003, and adjacent statutes.') }}</span>
+                    </li>
+                    <li style="display: flex; gap: 0.65rem; font-size: 14px; line-height: 1.6; color: var(--ink-soft);">
+                        <span style="color: var(--green); flex-shrink: 0;">✓</span>
+                        <span>{{ __('Cite the controlling article for every clause we generate.') }}</span>
+                    </li>
+                    <li style="display: flex; gap: 0.65rem; font-size: 14px; line-height: 1.6; color: var(--ink-soft);">
+                        <span style="color: var(--green); flex-shrink: 0;">✓</span>
+                        <span>{{ __('Lock civil-law terminology so the same concept is translated identically across the whole document.') }}</span>
+                    </li>
+                    <li style="display: flex; gap: 0.65rem; font-size: 14px; line-height: 1.6; color: var(--ink-soft);">
+                        <span style="color: var(--green); flex-shrink: 0;">✓</span>
+                        <span>{{ __('Refresh statutes against the source nightly and flag stale citations.') }}</span>
+                    </li>
+                    <li style="display: flex; gap: 0.65rem; font-size: 14px; line-height: 1.6; color: var(--ink-soft);">
+                        <span style="color: var(--green); flex-shrink: 0;">✓</span>
+                        <span>{{ __('Save every revision so you can roll back when senior counsel disagrees.') }}</span>
+                    </li>
+                </ul>
+            </div>
+
+            {{-- What we don't --}}
+            <div class="card-base" style="padding: 1.5rem 1.6rem; background: var(--canvas);">
+                <h3 style="font-family: var(--f-serif); font-size: 18px; font-weight: 600; color: var(--ink); margin: 0 0 1rem; letter-spacing: -0.01em;">
+                    {{ __("What we don't") }}
+                </h3>
+                <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem;">
+                    <li style="display: flex; gap: 0.65rem; font-size: 14px; line-height: 1.6; color: var(--ink-soft);">
+                        <span style="color: var(--ink-mute); flex-shrink: 0;">×</span>
+                        <span>{{ __('We are not a substitute for a licensed lawyer. Every clause we generate must be reviewed before signing.') }}</span>
+                    </li>
+                    <li style="display: flex; gap: 0.65rem; font-size: 14px; line-height: 1.6; color: var(--ink-soft);">
+                        <span style="color: var(--ink-mute); flex-shrink: 0;">×</span>
+                        <span>{{ __('We do not give legal advice. We draft. The judgment call is yours.') }}</span>
+                    </li>
+                    <li style="display: flex; gap: 0.65rem; font-size: 14px; line-height: 1.6; color: var(--ink-soft);">
+                        <span style="color: var(--ink-mute); flex-shrink: 0;">×</span>
+                        <span>{{ __('We do not silently ship clauses with unverifiable citations. We flag them.') }}</span>
+                    </li>
+                    <li style="display: flex; gap: 0.65rem; font-size: 14px; line-height: 1.6; color: var(--ink-soft);">
+                        <span style="color: var(--ink-mute); flex-shrink: 0;">×</span>
+                        <span>{{ __('We do not train our upstream AI providers on your contracts. Your content stays yours.') }}</span>
+                    </li>
+                    <li style="display: flex; gap: 0.65rem; font-size: 14px; line-height: 1.6; color: var(--ink-soft);">
+                        <span style="color: var(--ink-mute); flex-shrink: 0;">×</span>
+                        <span>{{ __('We do not pretend to cover jurisdictions we have not properly studied. Coverage status is shown on each jurisdiction page.') }}</span>
+                    </li>
+                </ul>
+            </div>
+
+            {{-- Where we are --}}
+            <div class="card-base" style="padding: 1.5rem 1.6rem; background: var(--canvas);">
+                <h3 style="font-family: var(--f-serif); font-size: 18px; font-weight: 600; color: var(--ink); margin: 0 0 1rem; letter-spacing: -0.01em;">
+                    {{ __('Where we stand today') }}
+                </h3>
+                <p style="font-size: 14px; line-height: 1.65; color: var(--ink-soft); margin: 0 0 1rem;">
+                    {{ __('Egypt is our launch jurisdiction. We are working with Egyptian counsel to get the corpus to production-grade citation accuracy. The other ten MENA jurisdictions are in active development with the same standard.') }}
+                </p>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
+                    <span style="display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--f-mono); font-size: 11px; padding: 0.3rem 0.7rem; background: #DDF1E5; color: #0E5A36; border-radius: 4px; font-weight: 600;">
+                        🇪🇬 EG · LIVE
+                    </span>
+                    <span style="font-family: var(--f-mono); font-size: 11px; padding: 0.3rem 0.7rem; background: #FBF1D8; color: #7A5A0F; border-radius: 4px; font-weight: 600;">
+                        🇸🇦 SA · BETA
+                    </span>
+                    <span style="font-family: var(--f-mono); font-size: 11px; padding: 0.3rem 0.7rem; background: #FBF1D8; color: #7A5A0F; border-radius: 4px; font-weight: 600;">
+                        🇦🇪 AE · BETA
+                    </span>
+                    <span style="font-family: var(--f-mono); font-size: 11px; padding: 0.3rem 0.7rem; background: #E9EDF2; color: #4B5868; border-radius: 4px; font-weight: 600;">
+                        +8 PREVIEW
+                    </span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+{{-- ────────────────────  Final CTA  ──────────────────── --}}
+<section class="final-cta">
+    <div class="wrap final-cta-card">
+        <div class="copy">
+            <h3>{{ __('Ready to draft with confidence?') }}</h3>
+            <p>{{ __('Built in Cairo, for Egyptian corporate counsel — and for the region as we expand.') }}</p>
+        </div>
+        <div style="display: flex; gap: 0.85rem; flex-wrap: wrap; align-items: center;">
+            @guest
+                <a href="{{ route('register') }}" class="btn-primary">{{ __('Start drafting for free') }}</a>
+                <a href="#preview" class="btn-outline">{{ __('View sample output') }}</a>
+            @endguest
+            @auth
+                <a href="{{ route('dashboard') }}" class="btn-primary">{{ __('Open dashboard') }}</a>
+            @endauth
+        </div>
+    </div>
+</section>
+
+{{-- ────────────────────  Footer  ──────────────────── --}}
+<footer class="footer">
+    <div class="wrap footer-grid">
+        <div>
+            <a href="{{ route('home') }}" style="display: inline-flex; align-items: center; gap: 0.65rem;">
+                <span class="logo-mark" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 21h18"/>
+                        <path d="M5 21V10l7-4 7 4v11"/>
+                        <path d="M9 21v-7h6v7"/>
+                        <circle cx="12" cy="10.5" r="1" fill="currentColor"/>
+                    </svg>
+                </span>
+                <span class="logo-text">My-lawyer</span>
+            </a>
+            <p class="blurb">{{ __('Built in Cairo for the region.') }}</p>
+            <div class="socials">
+                <a href="#" aria-label="LinkedIn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM8.5 18.5v-8H6v8zM7.25 9.25a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM18.5 18.5v-4.6c0-2.4-1.3-3.5-3-3.5a2.7 2.7 0 0 0-2.5 1.4v-1.3H10.5v8H13v-4.4c0-1 .7-1.6 1.5-1.6s1.5.6 1.5 1.6v4.4z"/></svg>
+                </a>
+                <a href="#" aria-label="X">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                </a>
+                <a href="#" aria-label="YouTube">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M23 7.6c0-2-1.6-3.6-3.6-3.6H4.6C2.6 4 1 5.6 1 7.6v8.8c0 2 1.6 3.6 3.6 3.6h14.8c2 0 3.6-1.6 3.6-3.6zM10 16V8l6 4z"/></svg>
+                </a>
+            </div>
+        </div>
+        <div>
+            <h5>{{ __('Jurisdictions') }}</h5>
+            <ul>
+                @foreach (array_slice($jurisdictions, 0, 6) as $j)
+                    <li><a href="{{ route('marketing.jurisdiction', ['iso' => $j['iso']]) }}">{{ $isAr ? $j['ar'] : $j['en'] }}</a></li>
+                @endforeach
+            </ul>
+        </div>
+        <div>
+            <h5>{{ __('Resources') }}</h5>
+            <ul>
+                <li><a href="{{ route('marketing.glossary') }}">{{ __('Glossary') }}</a></li>
+                <li><a href="{{ route('marketing.faq') }}">{{ __('FAQ') }}</a></li>
+                <li><a href="{{ route('home') }}#preview">{{ __('Sample output') }}</a></li>
+                <li><a href="{{ route('login') }}">{{ __('Sign in') }}</a></li>
+            </ul>
+        </div>
+        <div>
+            <h5>{{ __('Legal') }}</h5>
+            <ul>
+                <li><a href="{{ route('legal.terms') }}">{{ __('Terms of Service') }}</a></li>
+                <li><a href="{{ route('legal.privacy') }}">{{ __('Privacy Policy') }}</a></li>
+                <li><a href="{{ route('legal.dpa') }}">{{ __('DPA') }}</a></li>
+                <li><a href="{{ route('legal.aup') }}">{{ __('Acceptable Use') }}</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="wrap footer-bottom">
+        <span>© {{ date('Y') }} My-lawyer. {{ __('All rights reserved.') }}</span>
+        <span>{{ __('Built in Cairo for the region') }}</span>
+    </div>
+</footer>
+
+@include('partials.cookie-consent')
+
+</body>
 </html>

@@ -18,6 +18,28 @@
             </div>
         </div>
         <flux:menu.separator />
+
+        {{-- Locale switcher --}}
+        <div class="px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-zinc-500">{{ __('Language') }}</div>
+        <flux:menu.radio.group>
+            @foreach (['en' => __('English'), 'ar' => __('Arabic')] as $code => $label)
+                <form method="POST" action="{{ route('locale.set') }}" class="w-full">
+                    @csrf
+                    <input type="hidden" name="locale" value="{{ $code }}">
+                    <flux:menu.item
+                        as="button"
+                        type="submit"
+                        :icon="app()->getLocale() === $code ? 'check' : 'language'"
+                        class="w-full cursor-pointer"
+                    >
+                        {{ $label }}
+                    </flux:menu.item>
+                </form>
+            @endforeach
+        </flux:menu.radio.group>
+
+        <flux:menu.separator />
+
         <flux:menu.radio.group>
             <flux:menu.item :href="route('profile.edit')" icon="cog" wire:navigate>
                 {{ __('Settings') }}

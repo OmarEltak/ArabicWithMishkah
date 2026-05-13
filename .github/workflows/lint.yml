@@ -37,8 +37,10 @@ jobs:
           composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
           npm install
 
-      - name: Run Pint
-        run: composer lint
+      # Use lint:check (pint --test) so CI fails on style violations
+      # rather than silently auto-fixing them inside the CI runner.
+      - name: Run Pint (check only)
+        run: composer lint:check
 
       # - name: Commit Changes
       #   uses: stefanzweifel/git-auto-commit-action@v7
