@@ -102,4 +102,19 @@ return [
         'request_delay_ms' => (int) env('EASTLAWS_REQUEST_DELAY_MS', 3000),
     ],
 
+    // Stripe — used by Laravel Cashier and the BillingController fallbacks.
+    // Cashier reads `cashier.key/secret/webhook` from its own config (see
+    // `config/cashier.php` once it's published), but `services.stripe.*` is
+    // the conventional path other code and our own helpers read.
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'webhook' => [
+            'secret' => env('STRIPE_WEBHOOK_SECRET'),
+            'tolerance' => (int) env('STRIPE_WEBHOOK_TOLERANCE', 300),
+        ],
+        // Legacy single-key path used by BillingController::stripeConfigured().
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    ],
+
 ];

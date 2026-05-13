@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Laravel\Cashier\Checkout;
+use Stripe\Exception\InvalidRequestException;
 
 /**
  * Stripe-via-Cashier billing controller. Falls back gracefully when no
@@ -16,13 +17,18 @@ use Illuminate\Http\Response;
  * instead of throwing a fatal error.
  *
  * Wiring order (production):
- *   1. composer require laravel/cashier
- *   2. php artisan cashier:install
+ *   1. composer require laravel/cashier              ✓ done
+ *   2. php artisan migrate                           ✓ done (customer columns
+ *      came from 2026_05_12_000001; subscription_items from Cashier publish)
  *   3. Set STRIPE_KEY, STRIPE_SECRET, STRIPE_WEBHOOK_SECRET in .env
- *   4. Create products + prices in Stripe Dashboard, copy IDs into
- *      config/lawyer.php (`stripe_price_monthly` / `stripe_price_yearly`)
- *      via STRIPE_PRICE_SOLO_MONTHLY etc env vars
+ *   4. Create products + prices in Stripe Dashboard, copy IDs into env vars
+ *      (STRIPE_PRICE_SOLO_MONTHLY etc — see config/lawyer.php plans block)
  *   5. Set the webhook URL to /billing/webhook in Stripe Dashboard
+ *
+ * Webhook routing: we proxy to Cashier's WebhookController so signature
+ * verification + idempotency + all the standard event handlers come for
+ * free. Custom subscription side-effects (plan-flip on user, audit-log)
+ * are wired via the WebhookHandled event listener.
  *
  * Tap (MENA-friendly) wiring is documented separately in docs/BILLING.md;
  * once you have a Tap merchant account, this controller can be subclassed
@@ -33,7 +39,7 @@ class BillingController extends Controller
     /**
      * Kick off a Stripe Checkout session for the requested plan.
      */
-    public function checkout(Request $request, string $plan): RedirectResponse|Response
+    public function checkout(Request $request, string $plan): RedirectResponse|Response|Checkout
     {
         $validPlans = array_keys((array) config('lawyer.plans', []));
         abort_unless(in_array($plan, $validPlans, true) && $plan !== 'free' && $plan !== 'enterprise', 404);
@@ -45,22 +51,40 @@ class BillingController extends Controller
             ], 503);
         }
 
-        // When Cashier is installed, swap this stub for the real call:
-        //
-        //     return $request->user()
-        //         ->newSubscription('default', config("lawyer.plans.{$plan}.stripe_price_monthly"))
-        //         ->trialDays(14)
-        //         ->checkout([
-        //             'success_url' => route('billing.success').'?session_id={CHECKOUT_SESSION_ID}',
-        //             'cancel_url'  => route('marketing.pricing'),
-        //         ]);
-        //
-        // Until then, return a clear placeholder so the UI doesn't appear
-        // broken in development.
-        return response()->view('billing.cashier-pending', [
-            'plan' => $plan,
-            'message' => 'Cashier is not yet installed. Run `composer require laravel/cashier` and follow docs/BILLING.md.',
-        ], 503);
+        // Choose monthly by default; yearly is opt-in via ?cycle=yearly.
+        $cycle = $request->query('cycle') === 'yearly' ? 'yearly' : 'monthly';
+        $priceKey = $cycle === 'yearly' ? 'stripe_price_yearly' : 'stripe_price_monthly';
+        $priceId = config("lawyer.plans.{$plan}.{$priceKey}");
+
+        if (empty($priceId)) {
+            return response()->view('billing.not-configured', [
+                'plan' => $plan,
+                'reason' => "No Stripe price ID configured for {$plan} ({$cycle}). Set STRIPE_PRICE_".strtoupper($plan).'_'.strtoupper($cycle).' in .env.',
+            ], 503);
+        }
+
+        $user = $request->user();
+
+        try {
+            // Cashier's newSubscription() handles customer creation, trial
+            // period, and the redirect to Stripe's hosted checkout. The
+            // returned Checkout object is rendered as a redirect response
+            // by Laravel out of the box.
+            return $user
+                ->newSubscription('default', $priceId)
+                ->trialDays((int) config('lawyer.trial_days', 14))
+                ->checkout([
+                    'success_url' => route('billing.success').'?session_id={CHECKOUT_SESSION_ID}',
+                    'cancel_url' => route('marketing.pricing'),
+                ]);
+        } catch (InvalidRequestException $e) {
+            // Typically: bad price ID, currency mismatch, or trial already used.
+            // Surface a 503 with the message instead of a Stripe stack trace.
+            return response()->view('billing.not-configured', [
+                'plan' => $plan,
+                'reason' => 'Stripe rejected the checkout request: '.$e->getMessage(),
+            ], 503);
+        }
     }
 
     /**
@@ -83,11 +107,12 @@ class BillingController extends Controller
             metadata: [
                 'plan' => $user->plan,
                 'stripe_id' => $user->stripe_id,
+                'session_id' => $request->query('session_id'),
             ],
             userId: $user->id,
         );
 
-        return redirect()->route('billing.edit')->with('status', 'Welcome to '.ucfirst($user->plan).'! Your plan is active.');
+        return redirect()->route('billing.edit')->with('status', 'Welcome to '.ucfirst($user->plan ?? 'paid').'! Your plan is active.');
     }
 
     /**
@@ -96,55 +121,16 @@ class BillingController extends Controller
      */
     public function portal(Request $request): RedirectResponse|Response
     {
-        if (! $this->stripeConfigured() || empty($request->user()->stripe_id)) {
+        $user = $request->user();
+
+        if (! $this->stripeConfigured() || empty($user->stripe_id)) {
             return response()->view('billing.not-configured', [
-                'plan' => $request->user()->plan,
+                'plan' => $user->plan,
                 'reason' => 'No active Stripe customer for this account.',
             ], 503);
         }
 
-        // With Cashier:
-        //   return $request->user()->redirectToBillingPortal(route('settings.billing'));
-        return response()->view('billing.cashier-pending', [
-            'plan' => $request->user()->plan,
-            'message' => 'Cashier portal redirect — pending composer install.',
-        ], 503);
-    }
-
-    /**
-     * Stripe webhook endpoint. Verifies the signature before processing.
-     * Cashier provides a `WebhookController` that handles every event
-     * type for you; the stub below documents what to wire when you
-     * install it.
-     */
-    public function webhook(Request $request): Response
-    {
-        $signature = $request->header('Stripe-Signature');
-        $secret = (string) config('services.stripe.webhook_secret', '');
-
-        if (empty($secret)) {
-            return response('Webhook not configured', 503);
-        }
-
-        // Signature verification — Cashier does this automatically. The
-        // manual equivalent for reference:
-        //
-        //     $payload = $request->getContent();
-        //     try {
-        //         \Stripe\Webhook::constructEvent($payload, $signature, $secret);
-        //     } catch (\Stripe\Exception\SignatureVerificationException $e) {
-        //         return response('Invalid signature', 400);
-        //     }
-        //
-        // Events we care about (when Cashier is installed it handles all of these):
-        //   customer.subscription.created   → set user.plan from price metadata
-        //   customer.subscription.updated   → plan change / quantity update
-        //   customer.subscription.deleted   → drop user back to 'free'
-        //   invoice.payment_succeeded       → confirm renewal
-        //   invoice.payment_failed          → start dunning sequence
-        //   checkout.session.completed      → grant entitlements
-
-        return response('Cashier not installed — webhook is a stub.', 503);
+        return $user->redirectToBillingPortal(route('billing.edit'));
     }
 
     /**

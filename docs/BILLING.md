@@ -1,43 +1,40 @@
 # Billing Setup Guide
 
-> Read after `docs/DEPLOY.md`. This guide gets billing from "scaffold present
-> but stripe_configured = false" to "Solo and Firm customers can actually pay."
+> Read after `docs/DEPLOY.md`. This guide closes the loop: from a fresh
+> production deploy to "Solo and Firm customers can actually pay."
 
-The app already ships with:
+The app already ships **with Cashier fully wired in code**:
 
-- `/pricing` (public marketing page) — renders the 4 plans from `config/lawyer.php`
-- `/settings/billing` (authenticated) — shows current plan + usage + upgrade button
-- `App\Http\Controllers\BillingController` with stub methods for checkout, success, portal, webhook
-- `App\Services\Contracts\PlanUsageGate` — enforces draft caps per plan (already active)
-- `subscriptions` table + `users.stripe_id` etc. (Cashier-compatible schema)
-- Webhook URI `/billing/webhook` excluded from CSRF middleware
+- `/pricing` (public) — renders the 4 plans from `config/lawyer.php`
+- `/settings/billing` (auth) — shows current plan + usage + upgrade button
+- `App\Http\Controllers\BillingController` — Cashier-backed checkout / portal
+- `App\Services\Contracts\PlanUsageGate` — enforces draft caps per plan
+- `App\Listeners\StripeEventSubscriber` — flips `User.plan` and writes an
+  `AuditLog` row on every subscription.created/updated/deleted/payment.failed
+- `subscriptions` + `subscription_items` tables (Cashier schema)
+- `users.stripe_id / pm_type / pm_last_four / trial_ends_at` columns
+- Webhook route at `/billing/webhook` → Cashier's `WebhookController` with
+  Stripe-Signature verification and idempotency built in
+- CSRF disabled on the webhook URI; throttled to 60 req/min
 
-What you need to wire to make payments actually work:
+All you need to do is supply Stripe credentials and create the products.
 
-## 1. Install Laravel Cashier (5 min)
+## 1. Cashier install — already done
 
-```bash
-composer require laravel/cashier
-php artisan vendor:publish --tag="cashier-migrations"
-```
-
-**Drop our stand-in `subscriptions` table** (Cashier owns it; ours is a placeholder):
-
-```bash
-php artisan tinker --execute='Schema::dropIfExists("subscriptions");'
-php artisan migrate
-```
-
-Then add the `Billable` trait to `App\Models\User`:
+The code already has:
 
 ```php
+// app/Models/User.php
 use Laravel\Cashier\Billable;
 
 class User extends Authenticatable {
-    use Billable;
-    // ... existing code
+    use Billable; // ✓ already added
 }
 ```
+
+Migrations: customer columns on `users` (`2026_05_12_000001`) and the
+`subscriptions` / `subscription_items` tables (Cashier publish). All
+applied — `php artisan migrate:status` confirms.
 
 ## 2. Create the Stripe products (15 min)
 

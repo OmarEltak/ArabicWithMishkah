@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Listeners\StripeEventSubscriber;
 use App\Services\AI\AnthropicService;
 use App\Services\AI\CitationVerifier;
 use App\Services\AI\EmbeddingService;
@@ -19,6 +20,7 @@ use App\Services\Ingestion\IngestionService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -50,6 +52,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        // Cashier webhook side-effects (plan-flip on User, audit log entries).
+        Event::subscribe(StripeEventSubscriber::class);
     }
 
     /**

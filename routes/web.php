@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Laravel\Cashier\Http\Controllers\WebhookController;
 
 Route::view('/', 'welcome')->middleware('cache.public:900')->name('home');
 
@@ -93,9 +94,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/billing/portal', [BillingController::class, 'portal'])
         ->name('billing.portal');
 });
-// Webhook is public (Stripe needs to reach it) — signature-verified inside.
-// Rate-limited to throttle replay/flood attempts since the route is CSRF-free.
-Route::post('/billing/webhook', [BillingController::class, 'webhook'])
+// Webhook is public (Stripe needs to reach it). Cashier's WebhookController
+// verifies the Stripe-Signature header against STRIPE_WEBHOOK_SECRET, handles
+// idempotency, and dispatches a WebhookHandled event we listen to for our
+// own plan-flip + audit-log side effects (see App\Listeners\StripeEventSubscriber).
+// Rate-limited because the route is CSRF-free by necessity.
+Route::post('/billing/webhook', [WebhookController::class, 'handleWebhook'])
     ->middleware('throttle:60,1')
     ->name('billing.webhook');
 

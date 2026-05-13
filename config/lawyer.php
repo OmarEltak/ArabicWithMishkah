@@ -6,6 +6,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Billing — trial period
+    |--------------------------------------------------------------------------
+    |
+    | Days of free trial offered on first checkout for any paid plan.
+    | Cashier respects the value (no card needed during trial when set).
+    | Set to 0 to require a card up front.
+    */
+
+    'trial_days' => (int) env('LAWYER_TRIAL_DAYS', 14),
+
+    /*
+    |--------------------------------------------------------------------------
     | LLM and Embedding Provider
     |--------------------------------------------------------------------------
     */
@@ -108,10 +120,10 @@ return [
             'name_en' => 'Free',
             'name_ar' => 'مجاني',
             'price_monthly_egp' => 0,
-            'price_yearly_egp'  => 0,
+            'price_yearly_egp' => 0,
             'currency' => 'EGP',
             'stripe_price_monthly' => null,
-            'stripe_price_yearly'  => null,
+            'stripe_price_yearly' => null,
             'tap_plan_id' => null,
             'features' => [
                 'en' => [
@@ -135,10 +147,10 @@ return [
             'name_en' => 'Solo',
             'name_ar' => 'فردي',
             'price_monthly_egp' => 2400,    // EGP ~ $50
-            'price_yearly_egp'  => 24000,
+            'price_yearly_egp' => 24000,
             'currency' => 'EGP',
             'stripe_price_monthly' => env('STRIPE_PRICE_SOLO_MONTHLY'),
-            'stripe_price_yearly'  => env('STRIPE_PRICE_SOLO_YEARLY'),
+            'stripe_price_yearly' => env('STRIPE_PRICE_SOLO_YEARLY'),
             'tap_plan_id' => env('TAP_PLAN_SOLO'),
             'features' => [
                 'en' => [
@@ -164,10 +176,10 @@ return [
             'name_en' => 'Firm',
             'name_ar' => 'شركة',
             'price_monthly_egp' => 7900,    // EGP ~ $165
-            'price_yearly_egp'  => 79000,
+            'price_yearly_egp' => 79000,
             'currency' => 'EGP',
             'stripe_price_monthly' => env('STRIPE_PRICE_FIRM_MONTHLY'),
-            'stripe_price_yearly'  => env('STRIPE_PRICE_FIRM_YEARLY'),
+            'stripe_price_yearly' => env('STRIPE_PRICE_FIRM_YEARLY'),
             'tap_plan_id' => env('TAP_PLAN_FIRM'),
             'features' => [
                 'en' => [
@@ -195,10 +207,10 @@ return [
             'name_en' => 'Enterprise',
             'name_ar' => 'مؤسسات',
             'price_monthly_egp' => null, // contact sales
-            'price_yearly_egp'  => null,
+            'price_yearly_egp' => null,
             'currency' => 'EGP',
             'stripe_price_monthly' => null,
-            'stripe_price_yearly'  => null,
+            'stripe_price_yearly' => null,
             'tap_plan_id' => null,
             'features' => [
                 'en' => [
@@ -264,9 +276,9 @@ return [
         // We bake the ≤200k tier here as the planning baseline; the
         // UsageTracker computes the higher tier when a prompt actually
         // crosses 200k input tokens. Drafts rarely cross.
-        'gemini.gemini-2.5-pro'      => ['input' => 1.25, 'output' => 10.00, 'cache_read' => 0.31],
-        'gemini.gemini-2.5-flash'    => ['input' => 0.30, 'output' => 2.50],
-        'gemini'                     => ['input' => 1.25, 'output' => 10.00],
+        'gemini.gemini-2.5-pro' => ['input' => 1.25, 'output' => 10.00, 'cache_read' => 0.31],
+        'gemini.gemini-2.5-flash' => ['input' => 0.30, 'output' => 2.50],
+        'gemini' => ['input' => 1.25, 'output' => 10.00],
 
         // ── Anthropic (fallback) ──────────────────────────────────────────
         'anthropic.claude-sonnet-4-6' => ['input' => 3.00, 'output' => 15.00, 'cache_read' => 0.30, 'cache_creation' => 3.75],
