@@ -123,6 +123,11 @@ it('renders the audit page for a fresh user', function () {
     $this->actingAs($user)->get('/lawyer/audit')->assertOk();
 });
 
+it('renders the clippings page for a fresh user', function () {
+    $user = User::factory()->create(['email_verified_at' => now()]);
+    $this->actingAs($user)->get('/lawyer/clippings')->assertOk();
+});
+
 it('renders the contracts page with one contract present', function () {
     // A subtle regression has been previously caused by switching $guarded → $fillable
     // on Contract. Keep this case so the contracts index doesn't silently render empty.

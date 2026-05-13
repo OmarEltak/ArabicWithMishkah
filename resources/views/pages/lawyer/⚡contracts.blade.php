@@ -12,9 +12,12 @@ use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 new #[Title('Contracts')] class extends Component
 {
+    use WithPagination;
+
     public ?int $openId = null;
 
     public string $editBody = '';
@@ -54,8 +57,7 @@ new #[Title('Contracts')] class extends Component
         return Contract::query()
             ->where('user_id', Auth::id())
             ->latest('id')
-            ->limit(100)
-            ->get();
+            ->paginate(20);
     }
 
     #[Computed]
@@ -204,6 +206,22 @@ new #[Title('Contracts')] class extends Component
             fn () => print ($bytes),
             $name,
             ['Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+        );
+    }
+
+    public function downloadPdf(\App\Services\Contracts\ContractPdfExporter $exporter, ?string $bilingualLang = null)
+    {
+        $c = $this->active;
+        if (! $c) {
+            return null;
+        }
+        $bytes = $exporter->toPdf($c, $bilingualLang);
+        $name = $exporter->suggestedFilename($c, $bilingualLang);
+
+        return response()->streamDownload(
+            fn () => print ($bytes),
+            $name,
+            ['Content-Type' => 'application/pdf']
         );
     }
 
@@ -425,6 +443,12 @@ new #[Title('Contracts')] class extends Component
                 </li>
             @endforelse
         </ul>
+
+        @if ($this->contracts->hasPages())
+            <div class="border-t hairline px-3 py-2">
+                {{ $this->contracts->onEachSide(1)->links() }}
+            </div>
+        @endif
     </aside>
 
     {{-- Editor pane --}}
@@ -503,14 +527,26 @@ new #[Title('Contracts')] class extends Component
                                 wire:loading.attr="disabled"
                                 wire:target="downloadDocx"
                                 icon="arrow-down-tray"
-                                title="{{ __('.docx') }}"></flux:button>
+                                title="{{ __('.docx') }}">DOCX</flux:button>
+                            <flux:button size="xs" variant="ghost"
+                                wire:click="downloadPdf"
+                                wire:loading.attr="disabled"
+                                wire:target="downloadPdf"
+                                icon="document-arrow-down"
+                                title="{{ __('.pdf') }}">PDF</flux:button>
                             @if ($hasEn)
                                 <flux:button size="xs" variant="ghost"
                                     wire:click="downloadDocx('en')"
                                     wire:loading.attr="disabled"
                                     wire:target="downloadDocx"
                                     icon="arrow-down-tray"
-                                    title="{{ __('.docx (bilingual)') }}">EN</flux:button>
+                                    title="{{ __('.docx (bilingual)') }}">EN.docx</flux:button>
+                                <flux:button size="xs" variant="ghost"
+                                    wire:click="downloadPdf('en')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="downloadPdf"
+                                    icon="document-arrow-down"
+                                    title="{{ __('.pdf (bilingual)') }}">EN.pdf</flux:button>
                             @endif
                             @if (is_array($c->body_history) && count($c->body_history) > 0)
                                 <flux:button size="xs" :variant="$showHistory ? 'primary' : 'ghost'" wire:click="toggleHistory" icon="clock" title="{{ __('History') }}"></flux:button>
@@ -578,6 +614,11 @@ new #[Title('Contracts')] class extends Component
                         </div>
                         <div class="flex flex-wrap items-center gap-2">
                             <flux:button size="xs" variant="primary"
+                                wire:click="downloadPdf"
+                                wire:loading.attr="disabled"
+                                wire:target="downloadPdf"
+                                icon="document-arrow-down">{{ __('Download .pdf') }}</flux:button>
+                            <flux:button size="xs" variant="ghost"
                                 wire:click="downloadDocx"
                                 wire:loading.attr="disabled"
                                 wire:target="downloadDocx"

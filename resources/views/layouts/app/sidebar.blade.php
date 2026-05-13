@@ -32,6 +32,9 @@
                     <flux:sidebar.item icon="building-library" :href="route('lawyer.knowledge')" :current="request()->routeIs('lawyer.knowledge')" wire:navigate>
                         {{ __('Knowledge base') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="bookmark" :href="route('lawyer.clippings')" :current="request()->routeIs('lawyer.clippings')" wire:navigate>
+                        {{ __('Clippings') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
 
                 <flux:sidebar.group :heading="__('Operations')">

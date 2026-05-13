@@ -239,7 +239,7 @@
         <div class="meta-line">
             <span>{{ $isAr ? 'تحتاج إلى مساعدة؟' : 'Need help?' }}</span>
             <a href="/faq">{{ $isAr ? 'الأسئلة الشائعة' : 'FAQ' }}</a>
-            <a href="mailto:support@my-lawyer.app">{{ $isAr ? 'تواصل مع الدعم' : 'Contact support' }}</a>
+            <a href="mailto:{{ config('lawyer.support_email', 'support@my-lawyer.app') }}">{{ $isAr ? 'تواصل مع الدعم' : 'Contact support' }}</a>
         </div>
     </div>
 </main>

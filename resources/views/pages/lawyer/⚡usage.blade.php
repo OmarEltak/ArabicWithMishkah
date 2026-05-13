@@ -18,6 +18,8 @@ new #[Title('Usage & cost')] class extends Component {
     @php($globalPct = $d['today_global_budget_usd'] > 0 ? min(100, $d['today_global_usd'] / $d['today_global_budget_usd'] * 100) : 0)
     @php($userPct = $d['today_user_budget_usd'] > 0 ? min(100, $d['today_user_usd'] / $d['today_user_budget_usd'] * 100) : 0)
 
+    @php($isFirstRun = count($d['recent']) === 0 && (float) $d['today_user_usd'] === 0.0 && (float) $d['month_global_usd'] === 0.0)
+
     {{-- Header --}}
     <div class="border-b hairline pb-6">
         <span class="eyebrow-tag">{{ __('Operations') }}</span>
@@ -26,6 +28,35 @@ new #[Title('Usage & cost')] class extends Component {
             {{ __('Per-call cost tracking across Anthropic, Voyage, OpenAI, and Groq. Daily caps enforced before every paid request.') }}
         </p>
     </div>
+
+    @if ($isFirstRun)
+        <div class="mt-6 rounded-lg border border-dashed hairline p-8 md:p-10">
+            <div class="grid gap-6 md:grid-cols-[1.4fr_1fr] md:items-center">
+                <div>
+                    <span class="eyebrow-tag">{{ __('Nothing here yet') }}</span>
+                    <h2 class="display mt-3 text-xl text-zinc-900 dark:text-zinc-50 md:text-2xl">
+                        {{ __('Your usage will appear after your first draft') }}
+                    </h2>
+                    <p class="mt-2 max-w-md text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                        {{ __('Every AI call (clarifying turns, drafting, translation, citation verification) is logged with token counts and a USD estimate. Daily and per-call caps prevent surprise bills.') }}
+                    </p>
+                    <div class="mt-5 flex flex-wrap gap-2">
+                        <flux:button :href="route('lawyer.chat')" wire:navigate variant="primary" icon="pencil-square">
+                            {{ __('Start a draft') }}
+                        </flux:button>
+                        <flux:button :href="route('lawyer.knowledge')" wire:navigate variant="ghost" icon="building-library">
+                            {{ __('Browse knowledge base') }}
+                        </flux:button>
+                    </div>
+                </div>
+                <ul class="space-y-2.5 border-l hairline ps-5 text-sm text-zinc-600 dark:text-zinc-400">
+                    <li class="flex gap-2"><span class="text-zinc-400">→</span> {{ __('Daily cap (you):') }} <span class="ms-auto tabular-nums">${{ number_format($d['today_user_budget_usd'], 2) }}</span></li>
+                    <li class="flex gap-2"><span class="text-zinc-400">→</span> {{ __('Daily cap (global):') }} <span class="ms-auto tabular-nums">${{ number_format($d['today_global_budget_usd'], 2) }}</span></li>
+                    <li class="flex gap-2"><span class="text-zinc-400">→</span> {{ __('Providers tracked:') }} <span class="ms-auto font-mono text-xs">Anthropic, Gemini, Groq, Voyage</span></li>
+                </ul>
+            </div>
+        </div>
+    @endif
 
     {{-- Spend cards --}}
     <div class="mt-6 grid gap-4 md:grid-cols-3">

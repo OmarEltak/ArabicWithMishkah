@@ -1,9 +1,12 @@
 <?php
 
 use App\Jobs\IngestEastlawsDocumentJob;
+use App\Models\LegalClipping;
 use App\Models\LegalDocument;
 use App\Services\Ingestion\LegalContentFormatter;
 use Flux\Flux;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Component;
@@ -92,6 +95,45 @@ new #[Title('Law')] class extends Component {
         }
         $this->fetchNow();
     }
+
+    /**
+     * Save the document (optionally a specific section) to the user's
+     * clippings. Idempotent on (user, doc, snippet) within ~5 min so a
+     * double-click doesn't create a duplicate.
+     */
+    public function clip(?string $heading = null, ?string $body = null): void
+    {
+        $doc = $this->document;
+        if ($doc === null) {
+            return;
+        }
+
+        $snippet = trim((string) ($heading ? $heading."\n\n".(string) $body : ($body ?? '')));
+        if ($snippet === '') {
+            $snippet = Str::limit((string) $doc->content, 280);
+        }
+
+        $recent = LegalClipping::query()
+            ->where('user_id', Auth::id())
+            ->where('legal_document_id', $doc->id)
+            ->where('snippet', $snippet)
+            ->where('created_at', '>=', now()->subMinutes(5))
+            ->exists();
+        if ($recent) {
+            Flux::toast(variant: 'info', text: __('Already saved to clippings.'));
+
+            return;
+        }
+
+        LegalClipping::create([
+            'user_id' => Auth::id(),
+            'legal_document_id' => $doc->id,
+            'title' => $heading ?: $doc->title,
+            'snippet' => $snippet,
+        ]);
+
+        Flux::toast(variant: 'success', text: __('Saved to clippings.'));
+    }
 }; ?>
 
 <div class="mx-auto w-full max-w-4xl flex-col gap-6 px-6 py-8"
@@ -139,7 +181,31 @@ new #[Title('Law')] class extends Component {
                 </div>
             </div>
 
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2"
+                 x-data="{
+                     async copy(text, btn) {
+                         try { await navigator.clipboard.writeText(text); }
+                         catch (e) { return; }
+                         const orig = btn.innerText;
+                         btn.innerText = '{{ addslashes(__('Copied')) }}';
+                         setTimeout(() => { btn.innerText = orig; }, 1500);
+                     }
+                 }">
+                @php($_meta = is_array($doc->metadata) ? $doc->metadata : [])
+                @php($_fullCitation = trim(($_meta['citation_en'] ?? $_meta['citation_ar'] ?? '') . (($_meta['citation_en'] ?? null) ? ' (' . $doc->title . ')' : $doc->title)))
+                <button type="button"
+                    @click="copy(@js($_fullCitation), $event.currentTarget)"
+                    class="inline-flex items-center rounded-md border hairline px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800">
+                    <flux:icon.clipboard class="me-1.5 size-3.5" />
+                    {{ __('Copy citation') }}
+                </button>
+                <flux:button size="xs" variant="ghost"
+                    wire:click="clip"
+                    wire:loading.attr="disabled"
+                    wire:target="clip"
+                    icon="bookmark">
+                    {{ __('Save to clippings') }}
+                </flux:button>
                 @if (($doc->version ?? 1) > 1)
                     <a href="{{ route('lawyer.document-diff', ['docId' => $doc->id]) }}" wire:navigate
                        class="inline-flex items-center rounded-md border hairline px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800">
@@ -221,15 +287,45 @@ new #[Title('Law')] class extends Component {
         {{-- Body --}}
         @if ($doc->isIngestComplete() && mb_strlen($doc->content) > 0)
             @php($_sections = $this->sections)
-            <article class="space-y-3" dir="rtl">
+            @php($_citationMeta = is_array($doc->metadata) ? $doc->metadata : [])
+            @php($_docCitation = $_citationMeta['citation_en'] ?? $_citationMeta['citation_ar'] ?? $doc->title)
+            <article class="space-y-3" dir="rtl"
+                     x-data="{
+                         async copy(text, btn) {
+                             try { await navigator.clipboard.writeText(text); }
+                             catch (e) { return; }
+                             const orig = btn.innerText;
+                             btn.innerText = '{{ addslashes(__('Copied')) }}';
+                             setTimeout(() => { btn.innerText = orig; }, 1500);
+                         }
+                     }">
                 @foreach ($_sections as $section)
                     @if ($section['is_article'])
+                        @php($_citation = trim(($section['heading'] ?? '') . ' — ' . $_docCitation))
                         {{-- Article: rendered as a discrete card with the heading
                              on its own visually distinct row. --}}
-                        <section class="card p-5">
-                            <h3 class="font-serif text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                                {{ $section['heading'] }}
-                            </h3>
+                        <section class="card p-5 group">
+                            <div class="flex items-start justify-between gap-3">
+                                <h3 class="font-serif text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                                    {{ $section['heading'] }}
+                                </h3>
+                                <div class="flex flex-shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
+                                    <button type="button"
+                                        @click="copy(@js($_citation), $event.currentTarget)"
+                                        class="rounded-md border hairline px-2 py-1 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                                        title="{{ __('Copy citation') }}"
+                                        dir="ltr">
+                                        {{ __('Copy citation') }}
+                                    </button>
+                                    <button type="button"
+                                        wire:click="clip(@js($section['heading']), @js($section['body']))"
+                                        class="rounded-md border hairline px-2 py-1 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                                        title="{{ __('Save to clippings') }}"
+                                        dir="ltr">
+                                        {{ __('Clip') }}
+                                    </button>
+                                </div>
+                            </div>
                             @if ($section['body'] !== '')
                                 <div class="mt-3 whitespace-pre-line font-serif text-[15px] leading-loose text-zinc-800 dark:text-zinc-200">{{ $section['body'] }}</div>
                             @endif

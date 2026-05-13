@@ -297,18 +297,49 @@ new #[Title('Templates')] class extends Component {
     }
 }; ?>
 
-<div class="mx-auto flex h-[calc(100vh-1rem)] w-full max-w-screen-2xl gap-4 p-4">
-    {{-- Templates list --}}
-    <aside class="hidden w-72 flex-shrink-0 lg:flex bezel">
+<div class="mx-auto flex h-[calc(100vh-1rem)] w-full max-w-screen-2xl gap-4 p-4"
+     x-data="{ drawerOpen: false }"
+     @keydown.escape.window="drawerOpen = false">
+
+    {{-- Mobile drawer toggle — visible only below lg --}}
+    <div class="fixed start-3 top-20 z-30 lg:hidden">
+        <button type="button"
+            @click="drawerOpen = true"
+            class="flex items-center gap-2 rounded-full border hairline bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm dark:bg-zinc-900 dark:text-zinc-200">
+            <flux:icon.queue-list class="size-4" />
+            {{ __('Templates') }}
+        </button>
+    </div>
+
+    {{-- Backdrop --}}
+    <div class="fixed inset-0 z-40 bg-black/40 lg:hidden"
+         x-show="drawerOpen"
+         x-transition.opacity
+         @click="drawerOpen = false"
+         x-cloak></div>
+
+    {{-- Templates list — drawer on mobile, fixed column on lg+ --}}
+    <aside class="fixed inset-y-0 start-0 z-50 w-72 flex-shrink-0 transform bg-white shadow-2xl transition-transform duration-200 dark:bg-zinc-900
+                  lg:static lg:z-auto lg:flex lg:translate-x-0 lg:shadow-none lg:bg-transparent lg:dark:bg-transparent lg:bezel"
+           :class="drawerOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+           x-cloak>
         <div class="bezel-inner flex w-full flex-col overflow-hidden">
         <div class="flex items-center justify-between border-b hairline px-4 py-3">
             <span class="eyebrow-tag">{{ __('Templates') }}</span>
-            <flux:button size="xs" wire:click="startNew" icon="plus">{{ __('New') }}</flux:button>
+            <div class="flex items-center gap-1">
+                <flux:button size="xs" wire:click="startNew" icon="plus">{{ __('New') }}</flux:button>
+                <button type="button" @click="drawerOpen = false"
+                    class="rounded-md p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 lg:hidden dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                    aria-label="{{ __('Close') }}">
+                    <flux:icon.x-mark class="size-4" />
+                </button>
+            </div>
         </div>
         <ul class="flex-1 overflow-y-auto p-2 space-y-1">
             @forelse ($this->templates as $t)
                 <li class="group flex items-center gap-1">
                     <button wire:click="edit({{ $t->id }})"
+                        @click="drawerOpen = false"
                         class="flex-1 truncate rounded-md px-3 py-2 text-start text-sm transition
                         {{ $editId === $t->id ? 'bg-[var(--color-parchment)] dark:bg-zinc-800' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50' }}">
                         <span class="block truncate font-medium text-zinc-900 dark:text-zinc-100">{{ $t->name }}</span>

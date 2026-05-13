@@ -204,6 +204,7 @@ Route::middleware(['auth', 'verified', 'throttle:120,1'])->group(function () {
     Route::livewire('lawyer/templates', 'pages::lawyer.templates')->name('lawyer.templates');
     Route::livewire('lawyer/usage', 'pages::lawyer.usage')->name('lawyer.usage');
     Route::livewire('lawyer/audit', 'pages::lawyer.audit')->name('lawyer.audit');
+    Route::livewire('lawyer/clippings', 'pages::lawyer.clippings')->name('lawyer.clippings');
 });
 
 require __DIR__.'/settings.php';

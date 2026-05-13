@@ -6,6 +6,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Support contact
+    |--------------------------------------------------------------------------
+    |
+    | The address surfaced on error pages, the cookie consent banner, and
+    | from any "contact support" CTA. Centralised here so it can be changed
+    | without grepping the codebase.
+    */
+
+    'support_email' => env('SUPPORT_EMAIL', 'support@my-lawyer.app'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Billing — trial period
     |--------------------------------------------------------------------------
     |
