@@ -16,7 +16,20 @@ class LegalSearchQuery extends Model
 
     public const STATUS_RATE_LIMITED = 'rate_limited';
 
-    protected $guarded = [];
+    // Explicit fillable. Search-cache rows are written by the search
+    // service; never accept user-controlled payload arrays. Locked down
+    // for defence-in-depth.
+    protected $fillable = [
+        'normalized_query',
+        'raw_query',
+        'jurisdiction',
+        'upstream_result_count',
+        'ingested_count',
+        'search_count',
+        'last_searched_at',
+        'status',
+        'metadata',
+    ];
 
     protected $casts = [
         'metadata' => 'array',

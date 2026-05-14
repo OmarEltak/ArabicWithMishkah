@@ -9,7 +9,23 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AiUsageEvent extends Model
 {
-    protected $guarded = [];
+    // Explicit fillable. Usage rows are append-only telemetry written by
+    // UsageTracker only; never accept user-controlled data. Locked down
+    // for defence-in-depth.
+    protected $fillable = [
+        'user_id',
+        'provider',
+        'operation',
+        'model',
+        'input_tokens',
+        'output_tokens',
+        'cache_read_tokens',
+        'cache_creation_tokens',
+        'cost_micros',
+        'status',
+        'error_message',
+        'metadata',
+    ];
 
     protected $casts = [
         'metadata' => 'array',

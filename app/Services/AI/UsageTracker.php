@@ -124,7 +124,12 @@ class UsageTracker
         $todayUser = $userId ? AiUsageEvent::where('user_id', $userId)->whereDate('created_at', today())->sum('cost_micros') / 1_000_000 : 0.0;
         $monthGlobal = AiUsageEvent::whereBetween('created_at', [now()->startOfMonth(), now()])->sum('cost_micros') / 1_000_000;
 
+        // Scope recent calls to the requesting user. Each lawyer's usage
+        // page must show only their own AI activity — token counts and
+        // operation strings of other users would leak activity patterns
+        // and (via op names like 'draft.foo-contract') subject hints.
         $recent = AiUsageEvent::query()
+            ->where('user_id', $userId)
             ->latest('id')
             ->limit(20)
             ->get([

@@ -9,7 +9,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LegalChunk extends Model
 {
-    protected $guarded = [];
+    // Explicit fillable. Chunks are written by the ingestion pipeline only;
+    // never accept user input. Listing columns prevents future code paths
+    // from mass-assigning `legal_document_id` and re-parenting a chunk.
+    protected $fillable = [
+        'legal_document_id',
+        'position',
+        'content',
+        'embedding',
+        'embedding_dim',
+        'embedding_model',
+        'version',
+        'superseded_at',
+    ];
 
     protected $casts = [
         'embedding' => 'array',

@@ -48,6 +48,28 @@ class SecurityHeaders
             $headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains', false);
         }
 
+        // Content-Security-Policy — second line of defence against any
+        // future stored-XSS exploit. 'unsafe-inline' on script is required
+        // by Livewire's inline event handlers and Alpine.js x-data; tighten
+        // to nonces in a follow-up after the inline-handler audit. Style
+        // 'unsafe-inline' is required for Flux's component-scoped styles
+        // and the dark-mode swap. Font hosts are the two we use:
+        // fonts.bunny.net (privacy-respecting) and fonts.googleapis.com.
+        // frame-ancestors 'none' replaces X-Frame-Options for CSP-aware browsers.
+        $headers->set(
+            'Content-Security-Policy',
+            "default-src 'self'; "
+            ."script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            ."style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://fonts.googleapis.com; "
+            ."font-src 'self' data: https://fonts.bunny.net https://fonts.gstatic.com; "
+            ."img-src 'self' data: blob:; "
+            ."connect-src 'self'; "
+            ."frame-ancestors 'none'; "
+            ."base-uri 'self'; "
+            ."form-action 'self' https://checkout.stripe.com https://billing.stripe.com;",
+            false,
+        );
+
         // Health and webhook endpoints are not HTML — they should never be
         // indexed, even if a proxy caches them.
         if ($request->is('__internal/*') || $request->is('billing/webhook')) {

@@ -59,6 +59,15 @@ new #[Title('Law')] class extends Component {
         if ($doc === null || $doc->isIngestComplete()) {
             return;
         }
+        // Ownership gate. Public-corpus documents (user_id null) are
+        // refetch-able by anyone (intentional — that's how stubs turn
+        // into full text). Privately-uploaded documents can only be
+        // re-ingested by their owner.
+        if ($doc->user_id !== null && $doc->user_id !== Auth::id()) {
+            Flux::toast(variant: 'danger', text: __('You can only re-fetch your own documents.'));
+
+            return;
+        }
 
         $meta = is_array($doc->metadata) ? $doc->metadata : [];
         $recId = (int) ($meta['eastlaws_id'] ?? 0);

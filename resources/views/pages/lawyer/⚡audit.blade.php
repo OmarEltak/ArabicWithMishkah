@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\AuditLog;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
 use Livewire\Attributes\Url;
@@ -20,7 +21,17 @@ new #[Title('Audit log')] class extends Component
     #[Computed]
     public function rows()
     {
-        $q = AuditLog::query()->with(['user', 'subject'])->latest('id');
+        // Scope to the current user. System rows (user_id null) are included
+        // so the lawyer sees corpus-ingestion / freshness events that happened
+        // on documents in their workspace, but never another user's audit
+        // trail. This route is in the auth+verified group with no admin
+        // gate, so per-user scoping is mandatory.
+        $q = AuditLog::query()
+            ->with(['user', 'subject'])
+            ->where(function ($q): void {
+                $q->where('user_id', Auth::id())->orWhereNull('user_id');
+            })
+            ->latest('id');
         if ($this->filterAction !== '') {
             $q->where('action', 'like', $this->filterAction.'%');
         }
@@ -35,6 +46,9 @@ new #[Title('Audit log')] class extends Component
     public function actions(): array
     {
         return AuditLog::query()
+            ->where(function ($q): void {
+                $q->where('user_id', Auth::id())->orWhereNull('user_id');
+            })
             ->select('action')
             ->distinct()
             ->orderBy('action')

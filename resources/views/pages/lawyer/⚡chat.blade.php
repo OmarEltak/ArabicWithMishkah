@@ -63,7 +63,10 @@ new #[Title('Drafting workspace')] class extends Component
 
     public function startSession(ContractDraftingService $svc): void
     {
-        $this->validate(['newIntent' => 'required|string|min:10']);
+        // Hard cap on intent length — without it, a single multi-MB payload
+        // can blow the daily LLM budget in one call. 4000 chars ≈ 1000 tokens,
+        // a generous ceiling for a contract-intent description.
+        $this->validate(['newIntent' => 'required|string|min:10|max:4000']);
         $template = $this->newTemplateId
             ? ContractTemplate::query()
                 ->where('id', $this->newTemplateId)
@@ -110,7 +113,10 @@ new #[Title('Drafting workspace')] class extends Component
 
     public function sendReply(ContractDraftingService $svc): void
     {
-        $this->validate(['reply' => 'required|string|min:1']);
+        // Cap reply length so a malicious user can't exhaust the global
+        // daily budget in one request. 8000 chars ≈ 2000 tokens — far more
+        // than any legitimate clarification or edit-instruction needs.
+        $this->validate(['reply' => 'required|string|min:1|max:8000']);
         $session = $this->activeSession;
         if (! $session) {
             return;

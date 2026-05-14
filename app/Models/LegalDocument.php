@@ -10,7 +10,32 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class LegalDocument extends Model
 {
-    protected $guarded = [];
+    // Explicit fillable. LegalDocument rows are mostly written by the
+    // ingestion service via forceFill() (intentional, server-controlled).
+    // Listing the columns here makes the writable surface explicit and
+    // blocks any future Model::create([...request_payload...]) path from
+    // accidentally setting user_id (cross-tenant write) or ingest_status.
+    protected $fillable = [
+        'user_id',
+        'title',
+        'source',
+        'source_ref',
+        'jurisdiction',
+        'category',
+        'tags',
+        'language',
+        'metadata',
+        'content',
+        'chunk_count',
+        'ingest_status',
+        'ingested_at',
+        'content_hash',
+        'snippet_hash',
+        'last_verified_at',
+        'next_check_at',
+        'refresh_policy',
+        'version',
+    ];
 
     protected $casts = [
         'metadata' => 'array',

@@ -26,11 +26,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'cache.public' => CachePublicMarketing::class,
         ]);
 
-        // Stripe (and Tap) webhooks come from outside our app and can't
-        // carry a CSRF token. Exclude their URIs from the CSRF middleware.
+        // Stripe webhook comes from outside our app and can't carry a
+        // CSRF token. Re-add other webhook URIs ONLY when the route is
+        // actually registered AND its signature-verification middleware
+        // is wired — otherwise the exclusion sits as a latent
+        // CSRF-free POST surface waiting for a future endpoint to attach.
         $middleware->validateCsrfTokens(except: [
             'billing/webhook',
-            'billing/tap-webhook',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -38,14 +40,21 @@ return Application::configure(basePath: dirname(__DIR__))
         // alerting integrations (Sentry, Slack, Better Stack) only see
         // real failures, not the routine debug chatter on the default log.
         $exceptions->report(function (Throwable $e): void {
+            // Strip the deployment directory prefix so Slack/Sentry alerts
+            // don't expose the absolute filesystem path. Use ->url() (path
+            // only) not ->fullUrl() so a search query / contract id in a
+            // GET querystring doesn't propagate into the error sink.
+            $basePath = base_path().DIRECTORY_SEPARATOR;
+            $file = str_replace($basePath, '', (string) $e->getFile());
+
             Log::channel('errors')->error(
                 $e->getMessage(),
                 [
                     'exception' => $e::class,
-                    'file' => $e->getFile(),
+                    'file' => $file,
                     'line' => $e->getLine(),
                     'trace_short' => collect($e->getTrace())->take(8)->all(),
-                    'request_url' => request()?->fullUrl(),
+                    'request_url' => request()?->url(),
                     'user_id' => optional(auth()->user())->id,
                 ],
             );
