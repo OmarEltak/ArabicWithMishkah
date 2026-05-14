@@ -41,6 +41,9 @@
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
                         {{ __('Overview') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="folder" :href="route('lawyer.matters')" :current="request()->routeIs('lawyer.matters')" wire:navigate>
+                        {{ __('Matters') }}
+                    </flux:sidebar.item>
                     <flux:sidebar.item icon="chart-bar" :href="route('lawyer.usage')" :current="request()->routeIs('lawyer.usage')" wire:navigate>
                         {{ __('Usage & cost') }}
                     </flux:sidebar.item>

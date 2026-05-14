@@ -113,6 +113,7 @@ class UsageTracker
      *   today_global_usd:float, today_global_budget_usd:float,
      *   today_user_usd:float, today_user_budget_usd:float,
      *   month_global_usd:float, recent:array<int, array<string, mixed>>,
+     *   forecast:array{daily_rate:float, projected_month_usd:float, days_to_cap:?int, on_track:bool}|null,
      * }
      */
     public function dashboard(?int $userId = null): array
@@ -150,6 +151,54 @@ class UsageTracker
             'today_user_budget_usd' => $this->perUserDailyBudgetUsd,
             'month_global_usd' => $monthGlobal,
             'recent' => $recent,
+            'forecast' => $this->forecast($monthGlobal),
+        ];
+    }
+
+    /**
+     * Project month-end spend by linear extrapolation from the average
+     * daily burn rate so far this month. Returns null when there's no
+     * history yet (first day of the month, or no calls recorded).
+     *
+     * "Days to cap" is the rough day-of-month when, at the current rate,
+     * cumulative spend would equal the daily cap × elapsed days. It's
+     * advisory — the actual cap is enforced per-day, not month-aggregate.
+     *
+     * @return array{daily_rate:float, projected_month_usd:float, days_to_cap:?int, on_track:bool}|null
+     */
+    private function forecast(float $monthGlobal): ?array
+    {
+        $now = now();
+        $startOfMonth = $now->copy()->startOfMonth();
+        $elapsedDays = max(1, $startOfMonth->diffInDays($now) + 1);
+
+        if ($monthGlobal <= 0.0 || $elapsedDays < 1) {
+            return null;
+        }
+
+        $dailyRate = $monthGlobal / $elapsedDays;
+        $daysInMonth = (int) $now->copy()->endOfMonth()->format('d');
+        $projected = $dailyRate * $daysInMonth;
+
+        // "On track" means projected end-of-month spend stays within the
+        // daily cap × days-in-month implied monthly ceiling.
+        $monthlyCeiling = $this->dailyBudgetUsd * $daysInMonth;
+        $onTrack = $projected <= $monthlyCeiling;
+
+        // Day-of-month when cumulative spend at the current rate would
+        // first exceed the implied monthly ceiling. Null when always on
+        // track (which is the common case).
+        $daysToCap = null;
+        if (! $onTrack && $dailyRate > 0) {
+            $daysToCap = (int) ceil($monthlyCeiling / $dailyRate);
+            $daysToCap = min($daysToCap, $daysInMonth);
+        }
+
+        return [
+            'daily_rate' => round($dailyRate, 4),
+            'projected_month_usd' => round($projected, 2),
+            'days_to_cap' => $daysToCap,
+            'on_track' => $onTrack,
         ];
     }
 

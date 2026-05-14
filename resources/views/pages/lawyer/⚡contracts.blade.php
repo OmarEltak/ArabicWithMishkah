@@ -2,6 +2,7 @@
 
 use App\Models\Contract;
 use App\Models\LegalChunk;
+use App\Models\Matter;
 use App\Services\Audit\AuditLogger;
 use App\Services\Contracts\BilingualTranslator;
 use App\Services\Contracts\ContractDiffer;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Title;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -19,6 +21,11 @@ new #[Title('Contracts')] class extends Component
     use WithPagination;
 
     public ?int $openId = null;
+
+    // Filter the sidebar list by matter. ?matter=ID in the URL sets it.
+    // 'unassigned' is a sentinel meaning "contracts with matter_id IS NULL".
+    #[Url(as: 'matter')]
+    public string $matterFilter = '';
 
     public string $editBody = '';
 
@@ -54,10 +61,56 @@ new #[Title('Contracts')] class extends Component
     #[Computed]
     public function contracts()
     {
-        return Contract::query()
+        $q = Contract::query()
             ->where('user_id', Auth::id())
-            ->latest('id')
-            ->paginate(20);
+            ->latest('id');
+
+        if ($this->matterFilter === 'unassigned') {
+            $q->whereNull('matter_id');
+        } elseif ($this->matterFilter !== '' && is_numeric($this->matterFilter)) {
+            $q->where('matter_id', (int) $this->matterFilter);
+        }
+
+        return $q->paginate(20);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Matter>
+     */
+    #[Computed]
+    public function matters()
+    {
+        return Matter::query()
+            ->where('user_id', Auth::id())
+            ->where('status', 'active')
+            ->orderBy('client_name')
+            ->orderBy('matter_name')
+            ->get();
+    }
+
+    public function assignMatter(string $matterId = ''): void
+    {
+        $c = $this->active;
+        if (! $c) {
+            return;
+        }
+        $matterIdInt = $matterId === '' ? null : (int) $matterId;
+        // Verify the matter belongs to this user before assigning.
+        if ($matterIdInt !== null) {
+            $valid = Matter::query()->where('id', $matterIdInt)->where('user_id', Auth::id())->exists();
+            if (! $valid) {
+                return;
+            }
+        }
+        $c->update(['matter_id' => $matterIdInt]);
+        unset($this->contracts, $this->active);
+        app(AuditLogger::class)->log(
+            action: 'contract.matter.assigned',
+            subject: $c,
+            summary: $matterIdInt ? 'Assigned to matter '.$matterIdInt : 'Removed from matter',
+            metadata: ['matter_id' => $matterIdInt],
+        );
+        Flux::toast(variant: 'success', text: __('Matter updated.'));
     }
 
     #[Computed]
@@ -407,7 +460,19 @@ new #[Title('Contracts')] class extends Component
     <aside class="hidden w-80 flex-shrink-0 flex-col overflow-hidden rounded-lg border hairline bg-white dark:bg-zinc-900 lg:flex">
         <div class="border-b hairline px-4 py-3">
             <p class="eyebrow">{{ __('Saved contracts') }}</p>
-            <p class="text-xs text-zinc-500">{{ count($this->contracts) }} {{ __('total') }}</p>
+            <p class="text-xs text-zinc-500">{{ $this->contracts->total() }} {{ __('total') }}</p>
+
+            @if (count($this->matters) > 0)
+                <div class="mt-2.5">
+                    <flux:select wire:model.live="matterFilter" size="sm">
+                        <flux:select.option value="">{{ __('All matters') }}</flux:select.option>
+                        <flux:select.option value="unassigned">{{ __('— Unassigned —') }}</flux:select.option>
+                        @foreach ($this->matters as $m)
+                            <flux:select.option value="{{ $m->id }}">{{ $m->client_name }} — {{ $m->matter_name }}</flux:select.option>
+                        @endforeach
+                    </flux:select>
+                </div>
+            @endif
         </div>
         <ul class="flex-1 overflow-y-auto p-2">
             @forelse ($this->contracts as $c)
@@ -478,7 +543,7 @@ new #[Title('Contracts')] class extends Component
                 @php($hasEn = isset($translations['en']))
                 <header class="flex flex-wrap items-center justify-between gap-3 border-b hairline px-4 py-3 md:px-6 md:py-4">
                     <div class="min-w-0 flex-1 basis-full md:basis-auto">
-                        <div class="flex items-center gap-2">
+                        <div class="flex flex-wrap items-center gap-2">
                             <span class="eyebrow-tag">v{{ $c->version }}</span>
                             @php($statusPillClass = match($c->status) {
                                 'finalized' => 'pill pill-success',
@@ -487,6 +552,21 @@ new #[Title('Contracts')] class extends Component
                                 default => 'pill pill-info',
                             })
                             <span class="{{ $statusPillClass }}">{{ str_replace('_', ' ', $c->status) }}</span>
+
+                            {{-- Matter selector — inline so it's discoverable without opening a panel --}}
+                            @if (count($this->matters) > 0)
+                                <span class="text-zinc-300 dark:text-zinc-700">·</span>
+                                <flux:select size="sm" :value="(string) ($c->matter_id ?? '')" wire:change="assignMatter($event.target.value)">
+                                    <flux:select.option value="">{{ __('— No matter —') }}</flux:select.option>
+                                    @foreach ($this->matters as $m)
+                                        <flux:select.option value="{{ $m->id }}">{{ $m->client_name }} — {{ $m->matter_name }}</flux:select.option>
+                                    @endforeach
+                                </flux:select>
+                            @else
+                                <a href="{{ route('lawyer.matters') }}" wire:navigate class="text-xs text-zinc-500 underline hover:text-zinc-700 dark:hover:text-zinc-300">
+                                    {{ __('Create a matter') }}
+                                </a>
+                            @endif
                         </div>
                         <flux:input wire:model="editTitle" class="mt-1.5 !font-serif !text-base md:!text-lg" />
                     </div>

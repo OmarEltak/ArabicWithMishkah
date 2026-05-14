@@ -56,6 +56,11 @@ class User extends Authenticatable
         return $this->hasMany(Contract::class);
     }
 
+    public function matters(): HasMany
+    {
+        return $this->hasMany(Matter::class);
+    }
+
     /**
      * Get the user's initials
      */

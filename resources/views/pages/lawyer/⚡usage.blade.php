@@ -93,6 +93,27 @@ new #[Title('Usage & cost')] class extends Component {
         </div>
     </div>
 
+    {{-- Forecast row — only when we have at least one day of data --}}
+    @if (! empty($d['forecast']))
+        @php($f = $d['forecast'])
+        <div class="mt-4 flex flex-wrap items-center gap-2 rounded-md border hairline bg-zinc-50/60 px-4 py-3 text-sm dark:bg-zinc-950/30">
+            <flux:icon.presentation-chart-line class="size-4 text-zinc-400" />
+            <span class="text-zinc-700 dark:text-zinc-300">
+                {{ __('At the current burn rate of $:rate/day, you will spend about $:proj this month.', [
+                    'rate' => number_format($f['daily_rate'], 4),
+                    'proj' => number_format($f['projected_month_usd'], 2),
+                ]) }}
+            </span>
+            @if (! $f['on_track'] && $f['days_to_cap'])
+                <span class="pill pill-warning">
+                    {{ __('Will hit the daily cap aggregate by day :n', ['n' => $f['days_to_cap']]) }}
+                </span>
+            @else
+                <span class="pill pill-success">{{ __('On track') }}</span>
+            @endif
+        </div>
+    @endif
+
     {{-- Recent calls --}}
     <div class="mt-10">
         <div class="mb-4 flex items-baseline justify-between">

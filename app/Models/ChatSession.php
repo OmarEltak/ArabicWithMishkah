@@ -15,6 +15,7 @@ class ChatSession extends Model
     protected $fillable = [
         'user_id',
         'contract_template_id',
+        'matter_id',
         'title',
         'status',
         'collected_facts',
@@ -44,5 +45,10 @@ class ChatSession extends Model
     public function contracts(): HasMany
     {
         return $this->hasMany(Contract::class);
+    }
+
+    public function matter(): BelongsTo
+    {
+        return $this->belongsTo(Matter::class);
     }
 }

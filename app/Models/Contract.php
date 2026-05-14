@@ -16,6 +16,7 @@ class Contract extends Model
         'user_id',
         'chat_session_id',
         'contract_template_id',
+        'matter_id',
         'title',
         'status',
         'parties',
@@ -52,5 +53,10 @@ class Contract extends Model
     public function session(): BelongsTo
     {
         return $this->belongsTo(ChatSession::class, 'chat_session_id');
+    }
+
+    public function matter(): BelongsTo
+    {
+        return $this->belongsTo(Matter::class);
     }
 }
