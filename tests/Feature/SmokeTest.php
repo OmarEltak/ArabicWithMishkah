@@ -32,6 +32,12 @@ it('renders the pricing page', function () {
     $this->get('/pricing')->assertOk();
 });
 
+it('renders the Egypt-specific landing', function () {
+    $r = $this->get('/eg');
+    $r->assertOk();
+    $r->assertSee('EGP 999');
+});
+
 it('renders the FAQ page', function () {
     $this->get('/faq')->assertOk();
 });

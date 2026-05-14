@@ -130,6 +130,7 @@ return [
     */
     'plan_limits' => [
         'free' => ['drafts_per_month' => 3],
+        'starter_eg' => ['drafts_per_month' => 25],
         'solo' => ['drafts_per_month' => 25],
         'firm' => ['drafts_per_month' => 200],
         'enterprise' => ['drafts_per_month' => null], // unlimited
@@ -177,6 +178,44 @@ return [
             'cta_en' => 'Start free',
             'cta_ar' => 'ابدأ مجاناً',
             'highlighted' => false,
+        ],
+        // Egypt-specific entry-level tier. Same drafting cap as Solo but
+        // priced for the EGP-first market — the wedge plan for Cairo
+        // corporate lawyers. Linked from /eg landing only; not surfaced
+        // on the global /pricing page (which still leads with Solo).
+        'starter_eg' => [
+            'name_en' => 'Starter · Egypt',
+            'name_ar' => 'باقة الفرد · مصر',
+            'price_monthly_egp' => 999,
+            'price_yearly_egp' => 9990,    // 2 months free on annual
+            'currency' => 'EGP',
+            'stripe_price_monthly' => env('STRIPE_PRICE_STARTER_EG_MONTHLY'),
+            'stripe_price_yearly' => env('STRIPE_PRICE_STARTER_EG_YEARLY'),
+            'tap_plan_id' => env('TAP_PLAN_STARTER_EG'),
+            'features' => [
+                'en' => [
+                    '25 contract drafts per month',
+                    'Unlimited edits per draft',
+                    'Bilingual export, no watermark',
+                    'Full revision history (10 versions per contract)',
+                    'Counter-proposal paste + diff',
+                    'Citation audit panel',
+                    'Email support (24-hour response, in Arabic)',
+                ],
+                'ar' => [
+                    '٢٥ مسودة عقد شهرياً',
+                    'تعديلات غير محدودة لكل مسودة',
+                    'تصدير ثنائي اللغة بدون علامة مائية',
+                    'سجل المراجعات الكامل (١٠ إصدارات لكل عقد)',
+                    'استيراد العقد المضاد ومقارنته',
+                    'لوحة استشهادات موثقة',
+                    'دعم بالبريد الإلكتروني خلال ٢٤ ساعة (بالعربية)',
+                ],
+            ],
+            'cta_en' => 'Start 14-day free trial',
+            'cta_ar' => 'ابدأ تجربة ١٤ يوم',
+            'highlighted' => false,    // /eg page promotes it on its own
+            'region' => 'EG',          // hint for the pricing page filter
         ],
         'solo' => [
             'name_en' => 'Solo',
