@@ -38,6 +38,16 @@ it('renders the Egypt-specific landing', function () {
     $r->assertSee('EGP 999');
 });
 
+it('renders all 8 Egypt-Arabic contract SEO pages', function () {
+    foreach (['nda', 'employment', 'shareholders', 'services', 'lease', 'mou', 'spa', 'distribution'] as $type) {
+        $this->get('/eg/contracts/'.$type)->assertOk();
+    }
+});
+
+it('returns 404 for an unknown Egypt contract type', function () {
+    $this->get('/eg/contracts/spaceship')->assertNotFound();
+});
+
 it('renders the FAQ page', function () {
     $this->get('/faq')->assertOk();
 });

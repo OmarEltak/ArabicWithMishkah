@@ -80,6 +80,18 @@ Route::middleware('cache.public:900')->group(function () {
     // Linked from cold-email + LinkedIn launch posts.
     Route::view('/eg', 'marketing.eg')->name('marketing.eg');
 
+    // Egypt-Arabic contract-type SEO landing pages. Each one is curated
+    // legal content (statute references, FAQs with structured data,
+    // primary keyword in the H1) targeting high-intent Cairo lawyer
+    // searches — "صياغة عقد عمل في مصر" etc. Content lives in
+    // config/eg_seo.php; URLs are Latin slugs for stable crawling.
+    Route::get('/eg/contracts/{type}', function (string $type) {
+        $known = array_keys((array) config('eg_seo', []));
+        abort_unless(in_array($type, $known, true), 404);
+
+        return view('marketing.eg-contract', ['type' => $type]);
+    })->where('type', '[a-z0-9\-]+')->name('marketing.eg-contract');
+
     Route::view('/help', 'help.index')->name('help.index');
     Route::get('/help/{slug}', function (string $slug) {
         return view('help.show', ['slug' => $slug]);
