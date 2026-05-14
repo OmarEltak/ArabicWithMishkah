@@ -72,6 +72,20 @@ class BilingualTranslator
         }
 
         $jurisdiction = strtoupper($jurisdiction);
+
+        // Cache lookup — same body + lang + jurisdiction means a previously
+        // produced translation is still valid. Save a $0.02–$0.05 LLM call
+        // and ~10s of wall time per repeat translation. The cache key is
+        // hashed so it's safe to use as a key prefix even for huge bodies.
+        // 30-day TTL because legal text rarely changes that fast; if a
+        // user wants to force a re-translation, the cache key shifts the
+        // moment they edit a single character.
+        $cacheKey = 'translation:'.hash('sha256', $arabicBody.'|'.$targetLanguage.'|'.$jurisdiction);
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached) && isset($cached['body'])) {
+            return $cached + ['cache_hit' => true];
+        }
+
         [$glossary, $glossaryJurisdiction] = $this->loadGlossary($jurisdiction);
         $system = $this->buildSystemPrompt($glossary, $targetLanguage, $glossaryJurisdiction);
 
@@ -106,13 +120,17 @@ class BilingualTranslator
             $warnings = array_values(array_unique($m[1]));
         }
 
-        return [
+        $result = [
             'body' => $body,
             'model' => (string) ($response['raw']['model'] ?? config('services.gemini.model', 'unknown')),
             'generated_at' => now()->toIso8601String(),
             'glossary_jurisdiction' => $glossaryJurisdiction,
             'warnings' => $warnings,
         ];
+
+        Cache::put($cacheKey, $result, now()->addDays(30));
+
+        return $result + ['cache_hit' => false];
     }
 
     /**

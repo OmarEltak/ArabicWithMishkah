@@ -115,6 +115,10 @@
 
         {{ $slot }}
 
+        @persist('command-palette')
+            <livewire:command-palette />
+        @endpersist
+
         @persist('toast')
             <flux:toast.group>
                 <flux:toast />

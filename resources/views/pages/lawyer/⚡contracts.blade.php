@@ -39,6 +39,15 @@ new #[Title('Contracts')] class extends Component
 
     public ?int $compareIdx = null; // index in body_history (0 = most recent prior version)
 
+    /** @var array<int, int> Selected contract IDs for bulk actions. */
+    public array $selected = [];
+
+    public bool $bulkMode = false;
+
+    public bool $showCounterProposal = false;
+
+    public string $counterProposalText = '';
+
     /**
      * Initialize from URL query string. /lawyer/contracts?contract=5 will
      * open contract 5 on first paint, before Livewire JS has hydrated. This
@@ -86,6 +95,181 @@ new #[Title('Contracts')] class extends Component
             ->orderBy('client_name')
             ->orderBy('matter_name')
             ->get();
+    }
+
+    /**
+     * Open the counter-proposal panel. The lawyer pastes the counterparty's
+     * redlined text and we diff it against the current body.
+     */
+    public function openCounterProposal(): void
+    {
+        $this->showCounterProposal = true;
+        $this->counterProposalText = '';
+    }
+
+    public function closeCounterProposal(): void
+    {
+        $this->showCounterProposal = false;
+        $this->counterProposalText = '';
+    }
+
+    /**
+     * Diff the pasted counter-proposal against the current contract body.
+     * Returns null when nothing has been pasted yet.
+     *
+     * @return array{added:int, removed:int, unchanged:int, rows: array<int, array{type:string, text:string}>}|null
+     */
+    #[Computed]
+    public function counterProposalDiff(): ?array
+    {
+        if (! $this->showCounterProposal || trim($this->counterProposalText) === '') {
+            return null;
+        }
+        $c = $this->active;
+        if (! $c) {
+            return null;
+        }
+
+        return app(ContractDiffer::class)->diff($c->body, $this->counterProposalText);
+    }
+
+    /**
+     * Accept the counter-proposal — replace the body, snapshot the old one
+     * into body_history, bump the version, write an audit entry.
+     */
+    public function acceptCounterProposal(): void
+    {
+        $c = $this->active;
+        if (! $c) {
+            return;
+        }
+        $newBody = trim($this->counterProposalText);
+        if ($newBody === '' || $newBody === $c->body) {
+            $this->closeCounterProposal();
+
+            return;
+        }
+
+        $history = is_array($c->body_history) ? $c->body_history : [];
+        array_unshift($history, [
+            'version' => $c->version,
+            'body' => $c->body,
+            'saved_at' => now()->toIso8601String(),
+            'saved_by' => Auth::user()->name.' ('.__('pre-counter-proposal').')',
+        ]);
+        $history = array_slice($history, 0, 10);
+
+        $c->update([
+            'body' => $newBody,
+            'version' => $c->version + 1,
+            'body_history' => $history,
+            'status' => 'draft', // re-open from finalized if necessary
+        ]);
+
+        app(AuditLogger::class)->log(
+            action: 'contract.counter_proposal.accepted',
+            subject: $c,
+            summary: 'Counter-proposal accepted — body replaced from pasted text',
+            metadata: [
+                'old_length' => mb_strlen((string) ($history[0]['body'] ?? '')),
+                'new_length' => mb_strlen($newBody),
+                'new_version' => $c->version,
+            ],
+        );
+
+        $this->editBody = $newBody;
+        $this->closeCounterProposal();
+        unset($this->contracts, $this->active);
+        Flux::toast(variant: 'success', text: __('Counter-proposal accepted. Old version saved to history.'));
+    }
+
+    public function toggleBulkMode(): void
+    {
+        $this->bulkMode = ! $this->bulkMode;
+        $this->selected = [];
+    }
+
+    public function clearSelection(): void
+    {
+        $this->selected = [];
+    }
+
+    public function bulkArchive(): void
+    {
+        if (count($this->selected) === 0) {
+            return;
+        }
+        $ids = array_values(array_filter(array_map('intval', $this->selected)));
+        $affected = Contract::query()
+            ->where('user_id', Auth::id())
+            ->whereIn('id', $ids)
+            ->update(['status' => 'archived']);
+        $this->selected = [];
+        unset($this->contracts);
+        Flux::toast(variant: 'success', text: __(':n contracts archived.', ['n' => $affected]));
+    }
+
+    public function bulkAssignMatter(string $matterId = ''): void
+    {
+        if (count($this->selected) === 0) {
+            return;
+        }
+        $matterIdInt = $matterId === '' ? null : (int) $matterId;
+        if ($matterIdInt !== null) {
+            $valid = Matter::query()->where('id', $matterIdInt)->where('user_id', Auth::id())->exists();
+            if (! $valid) {
+                return;
+            }
+        }
+        $ids = array_values(array_filter(array_map('intval', $this->selected)));
+        $affected = Contract::query()
+            ->where('user_id', Auth::id())
+            ->whereIn('id', $ids)
+            ->update(['matter_id' => $matterIdInt]);
+        $this->selected = [];
+        unset($this->contracts);
+        Flux::toast(variant: 'success', text: __(':n contracts updated.', ['n' => $affected]));
+    }
+
+    public function bulkExportZip(\App\Services\Contracts\ContractPdfExporter $pdf)
+    {
+        if (count($this->selected) === 0) {
+            return null;
+        }
+        $ids = array_values(array_filter(array_map('intval', $this->selected)));
+        $contracts = Contract::query()
+            ->where('user_id', Auth::id())
+            ->whereIn('id', $ids)
+            ->get();
+        if ($contracts->isEmpty()) {
+            return null;
+        }
+
+        $zipPath = tempnam(sys_get_temp_dir(), 'bulk_').'.zip';
+        $zip = new \ZipArchive;
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+            Flux::toast(variant: 'danger', text: __('Could not create archive.'));
+
+            return null;
+        }
+        foreach ($contracts as $c) {
+            $bytes = $pdf->toPdf($c);
+            $name = $pdf->suggestedFilename($c);
+            $zip->addFromString($name, $bytes);
+        }
+        $zip->close();
+
+        $bytes = (string) file_get_contents($zipPath);
+        @unlink($zipPath);
+
+        $this->selected = [];
+        $stamp = now()->format('Ymd-His');
+
+        return response()->streamDownload(
+            fn () => print ($bytes),
+            "contracts-{$stamp}.zip",
+            ['Content-Type' => 'application/zip'],
+        );
     }
 
     public function assignMatter(string $matterId = ''): void
@@ -459,8 +643,17 @@ new #[Title('Contracts')] class extends Component
     {{-- Contracts list (desktop only) --}}
     <aside class="hidden w-80 flex-shrink-0 flex-col overflow-hidden rounded-lg border hairline bg-white dark:bg-zinc-900 lg:flex">
         <div class="border-b hairline px-4 py-3">
-            <p class="eyebrow">{{ __('Saved contracts') }}</p>
-            <p class="text-xs text-zinc-500">{{ $this->contracts->total() }} {{ __('total') }}</p>
+            <div class="flex items-center justify-between gap-2">
+                <p class="eyebrow">{{ __('Saved contracts') }}</p>
+                <button type="button"
+                    wire:click="toggleBulkMode"
+                    class="rounded-md border hairline px-2 py-1 text-[11px] font-medium transition
+                    {{ $bulkMode ? 'bg-[var(--color-parchment)] text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100' : 'text-zinc-500 hover:bg-zinc-50 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-300' }}"
+                    title="{{ __('Select multiple to archive, move, or export at once') }}">
+                    {{ $bulkMode ? __('Done') : __('Select') }}
+                </button>
+            </div>
+            <p class="mt-1 text-xs text-zinc-500">{{ $this->contracts->total() }} {{ __('total') }}</p>
 
             @if (count($this->matters) > 0)
                 <div class="mt-2.5">
@@ -474,6 +667,38 @@ new #[Title('Contracts')] class extends Component
                 </div>
             @endif
         </div>
+
+        {{-- Bulk-action toolbar — sticky just under the header when active --}}
+        @if ($bulkMode && count($selected) > 0)
+            <div class="border-b hairline bg-[var(--color-parchment)]/60 px-4 py-2.5 dark:bg-zinc-800/40">
+                <div class="flex items-baseline justify-between gap-2 text-[11px]">
+                    <span class="font-medium text-zinc-700 dark:text-zinc-300">{{ __(':n selected', ['n' => count($selected)]) }}</span>
+                    <button type="button" wire:click="clearSelection" class="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">{{ __('Clear') }}</button>
+                </div>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    <flux:button size="xs" variant="ghost"
+                        wire:click="bulkArchive"
+                        wire:confirm="{{ __('Archive the selected contracts?') }}"
+                        icon="archive-box">{{ __('Archive') }}</flux:button>
+                    <flux:button size="xs" variant="ghost"
+                        wire:click="bulkExportZip"
+                        wire:loading.attr="disabled"
+                        wire:target="bulkExportZip"
+                        icon="document-arrow-down">{{ __('Export .zip') }}</flux:button>
+                </div>
+                @if (count($this->matters) > 0)
+                    <div class="mt-2">
+                        <flux:select size="sm" value="" wire:change="bulkAssignMatter($event.target.value)">
+                            <flux:select.option value="" disabled selected>{{ __('Move to matter…') }}</flux:select.option>
+                            <flux:select.option value="">{{ __('— No matter —') }}</flux:select.option>
+                            @foreach ($this->matters as $m)
+                                <flux:select.option value="{{ $m->id }}">{{ $m->client_name }} — {{ $m->matter_name }}</flux:select.option>
+                            @endforeach
+                        </flux:select>
+                    </div>
+                @endif
+            </div>
+        @endif
         <ul class="flex-1 overflow-y-auto p-2">
             @forelse ($this->contracts as $c)
                 @php(
@@ -483,7 +708,16 @@ new #[Title('Contracts')] class extends Component
                         default => 'pill pill-info',
                     }
                 )
-                <li>
+                <li class="flex items-stretch gap-1">
+                    @if ($bulkMode)
+                        <label class="flex items-center px-2"
+                               title="{{ __('Select') }}">
+                            <input type="checkbox"
+                                wire:model.live="selected"
+                                value="{{ $c->id }}"
+                                class="size-4 rounded border-zinc-300 text-[var(--color-accent)] focus:ring-[var(--color-accent)] dark:border-zinc-700" />
+                        </label>
+                    @endif
                     {{-- Anchor + wire:click: anchor handles the click before
                          Livewire hydrates (URL updates immediately, page
                          reloads with ?contract=N which mount() honors); the
@@ -492,7 +726,7 @@ new #[Title('Contracts')] class extends Component
                     <a href="{{ route('lawyer.contracts') }}?contract={{ $c->id }}"
                         wire:click.prevent="open({{ $c->id }})"
                         wire:navigate
-                        class="block w-full rounded-md px-3 py-3 text-start transition
+                        class="block flex-1 rounded-md px-3 py-3 text-start transition
                         {{ $openId === $c->id ? 'bg-[var(--color-parchment)] dark:bg-zinc-800' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50' }}">
                         <span class="block truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{{ $c->title }}</span>
                         <div class="mt-1.5 flex items-center justify-between gap-2">
@@ -633,6 +867,12 @@ new #[Title('Contracts')] class extends Component
                             @endif
                         </div>
 
+                        {{-- Counter-proposal: paste the counterparty's redlined version and diff it. --}}
+                        <flux:button size="xs" variant="ghost"
+                            wire:click="openCounterProposal"
+                            icon="arrows-right-left"
+                            title="{{ __('Paste a counterparty redline and review the diff') }}">{{ __('Counter-proposal') }}</flux:button>
+
                         {{-- Island 3: status transitions / destructive --}}
                         @if ($c->status !== 'finalized')
                             <flux:button size="sm" variant="primary"
@@ -711,6 +951,58 @@ new #[Title('Contracts')] class extends Component
                                     icon="arrow-down-tray">{{ __('Bilingual .docx') }}</flux:button>
                             @endif
                         </div>
+                    </div>
+                @endif
+
+                {{-- Counter-proposal panel — overlays the editor when active --}}
+                @if ($showCounterProposal)
+                    <div class="border-b hairline bg-zinc-50/60 px-4 py-4 md:px-6 dark:bg-zinc-950/30">
+                        <div class="flex items-baseline justify-between gap-3">
+                            <div>
+                                <span class="eyebrow-tag">{{ __('Counter-proposal') }}</span>
+                                <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                                    {{ __('Paste the counterparty\'s redlined text below. We will diff it against the current version. Accepting saves a new version; the old one stays in history.') }}
+                                </p>
+                            </div>
+                            <flux:button size="xs" variant="ghost" wire:click="closeCounterProposal" icon="x-mark"></flux:button>
+                        </div>
+
+                        <textarea
+                            wire:model.live.debounce.500ms="counterProposalText"
+                            placeholder="{{ __('Paste counterparty redline here…') }}"
+                            class="mt-3 block min-h-[140px] w-full rounded-md border hairline bg-white p-3 font-serif text-[14px] leading-relaxed text-zinc-900 outline-none focus:border-[var(--color-accent)] dark:bg-zinc-900 dark:text-zinc-100"
+                            dir="auto"></textarea>
+
+                        @php($_cpDiff = $this->counterProposalDiff)
+                        @if ($_cpDiff)
+                            <div class="mt-4 rounded-md border hairline bg-white dark:bg-zinc-900">
+                                <div class="flex items-center justify-between gap-3 border-b hairline px-3 py-2 text-xs">
+                                    <span class="flex items-center gap-3">
+                                        <span class="pill pill-success">+ {{ $_cpDiff['added'] }} {{ __('added') }}</span>
+                                        <span class="pill pill-danger">− {{ $_cpDiff['removed'] }} {{ __('removed') }}</span>
+                                        <span class="text-zinc-500">{{ $_cpDiff['unchanged'] }} {{ __('unchanged') }}</span>
+                                    </span>
+                                    <flux:button size="xs" variant="primary"
+                                        wire:click="acceptCounterProposal"
+                                        wire:confirm="{{ __('Replace the contract body with this counter-proposal? The old version is kept in history.') }}"
+                                        icon="check">{{ __('Accept and save as new version') }}</flux:button>
+                                </div>
+                                <div class="max-h-[300px] overflow-y-auto p-3 font-mono text-[12px] leading-relaxed" dir="auto">
+                                    @foreach ($_cpDiff['rows'] as $row)
+                                        @switch($row['type'])
+                                            @case('added')
+                                                <div class="bg-emerald-50 px-2 py-0.5 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200">+ {{ $row['text'] }}</div>
+                                                @break
+                                            @case('removed')
+                                                <div class="bg-rose-50 px-2 py-0.5 text-rose-900 line-through dark:bg-rose-950/40 dark:text-rose-200">− {{ $row['text'] }}</div>
+                                                @break
+                                            @default
+                                                <div class="px-2 py-0.5 text-zinc-600 dark:text-zinc-400">&nbsp;&nbsp;{{ $row['text'] }}</div>
+                                        @endswitch
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 @endif
 
