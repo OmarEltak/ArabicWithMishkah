@@ -437,6 +437,11 @@
 </head>
 <body>
 
+<a href="#main-content" class="skip-to-content"
+   style="position: absolute; top: -100px; left: 50%; transform: translateX(-50%); padding: 0.75rem 1.25rem; background: var(--ink); color: #fff; text-decoration: none; border-radius: 0 0 8px 8px; font-size: 14px; font-weight: 600; z-index: 9999; transition: top 0.15s;"
+   onfocus="this.style.top='0'"
+   onblur="this.style.top='-100px'">{{ __('Skip to main content') }}</a>
+
 {{-- ────────────────────  Header  ──────────────────── --}}
 <header class="nav-shell">
     <div class="wrap" style="display: flex; align-items: center; justify-content: space-between; height: 72px; gap: 1rem;">
@@ -492,7 +497,7 @@
 })();
 </script>
 
-<main>
+<main id="main-content" tabindex="-1">
 {{ $slot }}
 </main>
 
@@ -541,6 +546,8 @@
                 <li><a href="{{ route('marketing.pricing') }}">{{ __('Pricing') }}</a></li>
                 <li><a href="{{ route('marketing.glossary') }}">{{ __('Glossary') }}</a></li>
                 <li><a href="{{ route('marketing.faq') }}">{{ __('FAQ') }}</a></li>
+                <li><a href="{{ route('help.index') }}">{{ __('Help Center') }}</a></li>
+                <li><a href="{{ route('changelog') }}">{{ __('Changelog') }}</a></li>
                 <li><a href="{{ route('home') }}#preview">{{ __('Sample output') }}</a></li>
                 <li><a href="{{ route('login') }}">{{ __('Sign in') }}</a></li>
             </ul>

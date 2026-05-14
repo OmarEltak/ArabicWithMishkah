@@ -113,7 +113,13 @@
             </flux:dropdown>
         </flux:header>
 
-        {{ $slot }}
+        <a href="#main-content" class="skip-to-content">{{ __('Skip to main content') }}</a>
+
+        @include('partials.announcement-banner')
+
+        <div id="main-content" tabindex="-1">
+            {{ $slot }}
+        </div>
 
         @persist('command-palette')
             <livewire:command-palette />

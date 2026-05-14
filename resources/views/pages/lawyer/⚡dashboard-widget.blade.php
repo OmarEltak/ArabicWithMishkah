@@ -81,22 +81,55 @@ new class extends Component
         $this->trySample($svc, 'corporate');
     }
 
+    /**
+     * Official-corpus aggregates (count + stale) shared across multiple
+     * computed properties. Cached at the user/global level for 5 min;
+     * the corpus only changes on ingestion-job completion, so a 5-min
+     * staleness window is acceptable and the cache saves 2 full-table
+     * scans per dashboard render.
+     *
+     * @return array{total:int, stale:int}
+     */
+    #[Computed]
+    public function corpusAggregates(): array
+    {
+        return cache()->remember('dashboard.corpus_aggregates', 300, function (): array {
+            $official = (array) config('legal_sources.official_slugs', ['eastlaws']);
+            $total = LegalDocument::query()->whereIn('source', $official)->count();
+            $stale = LegalDocument::query()
+                ->whereIn('source', $official)
+                ->where(function ($q) {
+                    $q->whereNull('next_check_at')->orWhere('next_check_at', '<=', now());
+                })
+                ->count();
+
+            return ['total' => $total, 'stale' => $stale];
+        });
+    }
+
     #[Computed]
     public function counts(): array
     {
         $userId = Auth::id();
-        $official = (array) config('legal_sources.official_slugs', ['eastlaws']);
+        $userScopedDocs = LegalDocument::query()
+            ->where(function ($q) use ($userId) {
+                $q->where('user_id', $userId)->orWhereNull('user_id');
+            })
+            ->count();
+
+        // Roll up Contract aggregates in one query (count + finalized) so
+        // we don't scan the contracts table twice per render.
+        $contractRow = Contract::query()
+            ->where('user_id', $userId)
+            ->selectRaw("COUNT(*) AS total, SUM(CASE WHEN status = 'finalized' THEN 1 ELSE 0 END) AS finalised")
+            ->first();
 
         return [
-            'documents' => LegalDocument::query()
-                ->where(function ($q) use ($userId) {
-                    $q->where('user_id', $userId)->orWhereNull('user_id');
-                })
-                ->count(),
-            'official' => LegalDocument::query()->whereIn('source', $official)->count(),
+            'documents' => $userScopedDocs,
+            'official' => $this->corpusAggregates['total'],
             'sessions' => ChatSession::query()->where('user_id', $userId)->count(),
-            'contracts' => Contract::query()->where('user_id', $userId)->count(),
-            'finalised' => Contract::query()->where('user_id', $userId)->where('status', 'finalized')->count(),
+            'contracts' => (int) ($contractRow->total ?? 0),
+            'finalised' => (int) ($contractRow->finalised ?? 0),
         ];
     }
 
@@ -131,14 +164,9 @@ new class extends Component
     #[Computed]
     public function freshness(): array
     {
-        $official = (array) config('legal_sources.official_slugs', ['eastlaws']);
-        $total = LegalDocument::query()->whereIn('source', $official)->count();
-        $stale = LegalDocument::query()
-            ->whereIn('source', $official)
-            ->where(function ($q) {
-                $q->whereNull('next_check_at')->orWhere('next_check_at', '<=', now());
-            })
-            ->count();
+        $agg = $this->corpusAggregates;
+        $total = $agg['total'];
+        $stale = $agg['stale'];
 
         return [
             'total' => $total,

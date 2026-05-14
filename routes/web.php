@@ -75,6 +75,13 @@ Route::middleware('cache.public:900')->group(function () {
 
     Route::view('/faq', 'marketing.faq')->name('marketing.faq');
     Route::view('/pricing', 'marketing.pricing')->name('marketing.pricing');
+
+    Route::view('/help', 'help.index')->name('help.index');
+    Route::get('/help/{slug}', function (string $slug) {
+        return view('help.show', ['slug' => $slug]);
+    })->where('slug', '[a-z0-9\-]+')->name('help.show');
+
+    Route::view('/changelog', 'marketing.changelog')->name('changelog');
 });
 
 /*

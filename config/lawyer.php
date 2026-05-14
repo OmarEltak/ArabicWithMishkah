@@ -18,6 +18,29 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | In-app announcement banner
+    |--------------------------------------------------------------------------
+    |
+    | When ANNOUNCEMENT_BODY is set in env, every authenticated page shows a
+    | dismissible banner with this body. ANNOUNCEMENT_ID is the dismissal
+    | key — change it whenever the announcement text changes so previously-
+    | dismissed users see the new banner.
+    |
+    | ANNOUNCEMENT_LEVEL is one of: info | success | warning | danger
+    | (affects the banner color). Defaults to "info".
+    |
+    | ANNOUNCEMENT_LINK / ANNOUNCEMENT_LINK_LABEL add an optional CTA.
+    */
+    'announcement' => [
+        'id' => env('ANNOUNCEMENT_ID', 'default'),
+        'body' => env('ANNOUNCEMENT_BODY'),
+        'level' => env('ANNOUNCEMENT_LEVEL', 'info'),
+        'link' => env('ANNOUNCEMENT_LINK'),
+        'link_label' => env('ANNOUNCEMENT_LINK_LABEL'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Billing — trial period
     |--------------------------------------------------------------------------
     |

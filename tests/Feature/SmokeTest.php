@@ -59,6 +59,24 @@ it('renders the sitemap with the right content-type', function () {
     expect($r->headers->get('Content-Type'))->toContain('application/xml');
 });
 
+it('renders the help center index', function () {
+    $r = $this->get('/help');
+    $r->assertOk();
+    $r->assertSee('Getting started');
+});
+
+it('renders an individual help article', function () {
+    $this->get('/help/getting-started')->assertOk()->assertSee('Getting started');
+});
+
+it('returns 404 for unknown help slugs', function () {
+    $this->get('/help/does-not-exist')->assertNotFound();
+});
+
+it('renders the changelog', function () {
+    $this->get('/changelog')->assertOk()->assertSee('Changelog');
+});
+
 /* ─────────────────  Error pages  ───────────────── */
 
 it('renders the 404 page on an unknown URL', function () {
