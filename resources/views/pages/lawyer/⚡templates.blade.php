@@ -9,7 +9,8 @@ use Livewire\Attributes\Title;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
-new #[Title('Templates')] class extends Component {
+new #[Title('Templates')] class extends Component
+{
     public ?int $editId = null;
 
     #[Validate('required|string|min:2|max:255')]
@@ -98,7 +99,16 @@ new #[Title('Templates')] class extends Component {
 
     public function edit(int $id): void
     {
-        $t = ContractTemplate::query()->where('id', $id)->first();
+        // Scope the read: a user can edit only their own templates, plus
+        // surface system templates (they're read-only — warn). Reading a
+        // template owned by ANOTHER user must 404, otherwise the form
+        // hydrates with that user's template body (information disclosure).
+        $t = ContractTemplate::query()
+            ->where('id', $id)
+            ->where(function ($q): void {
+                $q->where('user_id', Auth::id())->orWhere('is_system', true);
+            })
+            ->first();
         if (! $t) {
             return;
         }
@@ -130,7 +140,14 @@ new #[Title('Templates')] class extends Component {
 
     public function duplicate(int $id): void
     {
-        $t = ContractTemplate::query()->where('id', $id)->first();
+        // Same scope as edit() — you can duplicate your own templates plus
+        // any system template, but never another user's private template.
+        $t = ContractTemplate::query()
+            ->where('id', $id)
+            ->where(function ($q): void {
+                $q->where('user_id', Auth::id())->orWhere('is_system', true);
+            })
+            ->first();
         if (! $t) {
             return;
         }

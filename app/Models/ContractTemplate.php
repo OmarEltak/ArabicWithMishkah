@@ -9,7 +9,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ContractTemplate extends Model
 {
-    protected $guarded = [];
+    // Explicit fillable to prevent a user-controlled payload from setting
+    // `is_system` true and turning their template into a globally-visible
+    // one. `is_system` is intentionally NOT in this list — set it via
+    // direct property assignment from server-controlled code only.
+    protected $fillable = [
+        'user_id',
+        'name',
+        'slug',
+        'category',
+        'jurisdiction',
+        'language',
+        'description',
+        'body',
+        'required_fields',
+    ];
 
     protected $casts = [
         'required_fields' => 'array',
